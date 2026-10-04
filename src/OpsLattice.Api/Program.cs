@@ -1,5 +1,5 @@
-using OpsLattice.Scenarios.Airport.Flights;
 using System.Text.Json.Serialization;
+using OpsLattice.Scenarios.Airport.Flights;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +11,20 @@ builder.Services
             new JsonStringEnumConverter());
     });
 
+builder.Services.AddOpenApi();
+
 builder.Services.AddSingleton<IFlightProvider, InMemoryFlightProvider>();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("WebClient", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:65494")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
@@ -21,6 +34,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("WebClient");
 
 app.MapControllers();
 
