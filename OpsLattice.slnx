@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OpsLattice.Api/OpsLattice.Api.csproj" Id="87057847-ecd3-40e2-a4a1-38cbc8763c11" />
+    <Project Path="src/OpsLattice.Core/OpsLattice.Core.csproj" Id="fbe8298f-d6b6-4ef3-a2f4-b790ecc233e0" />
+    <Project Path="src/OpsLattice.Scenarios.Airport/OpsLattice.Scenarios.Airport.csproj" Id="4c085779-2015-461f-9429-b0f8bfeea7ae" />
+    <Project Path="src/OpsLattice.Simulator/OpsLattice.Simulator.csproj" Id="22aa3dde-e467-4b48-ab5e-3381b2a61bf0" />
+    <Project Path="src/OpsLattice.Web/opslattice.web.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OpsLattice.Architecture.Tests/OpsLattice.Architecture.Tests.csproj" Id="489cbb7e-d566-4258-96a8-acfc16df4d4e" />
+    <Project Path="tests/OpsLattice.Core.Tests/OpsLattice.Core.Tests.csproj" Id="b03c80eb-57f3-497d-9438-ef48f8dbff12" />
+    <Project Path="tests/OpsLattice.Scenarios.Airport.Tests/OpsLattice.Scenarios.Airport.Tests.csproj" Id="015e9f60-7821-46db-8457-09d5aac52793" />
+    <Project Path="tests/OpsLattice.Simulator.Tests/OpsLattice.Simulator.Tests.csproj" Id="e24f78a3-0fc5-44bb-bc88-6c0f590e45d2" />
+  </Folder>
+</Solution>

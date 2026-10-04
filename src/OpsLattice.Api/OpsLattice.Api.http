@@ -1,0 +1,6 @@
+@OpsLattice.Api_HostAddress = http://localhost:5160
+
+GET {{OpsLattice.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
