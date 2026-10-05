@@ -5,4 +5,6 @@ export interface Flight {
   destination: string;
   scheduledTime: string;
   status: string;
+  approachStartedAt: string | null;
+  gate: string | null;
 }

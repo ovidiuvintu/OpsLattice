@@ -75,6 +75,7 @@ export function FlightsPage() {
             <th>Destination</th>
             <th>Scheduled</th>
             <th>Status</th>
+            <th>Gate</th>
           </tr>
         </thead>
 
@@ -86,11 +87,10 @@ export function FlightsPage() {
               <td>{flight.origin}</td>
               <td>{flight.destination}</td>
               <td>
-                {new Date(
-                  flight.scheduledTime
-                ).toLocaleString()}
+                {new Date(flight.scheduledTime).toLocaleString()}
               </td>
               <td>{flight.status}</td>
+              <td>{flight.gate ?? "—"}</td>
             </tr>
           ))}
         </tbody>
