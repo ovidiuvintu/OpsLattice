@@ -1,31 +1,70 @@
 import { useEffect, useState } from "react";
 import type { Flight } from "./Flight";
 import { getFlights } from "./flightsApi";
+import { advanceSimulation } from "../simulation/simulationApi";
 
 export function FlightsPage() {
   const [flights, setFlights] = useState<Flight[]>([]);
+  const [simulationTime, setSimulationTime] =
+    useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isAdvancing, setIsAdvancing] = useState(false);
+
+  async function loadFlights() {
+    const data = await getFlights();
+    setFlights(data);
+  }
 
   useEffect(() => {
-    async function loadFlights() {
+    async function load() {
       try {
-        const result = await getFlights();
-        setFlights(result);
+        await loadFlights();
       } catch {
         setError("Unable to load flights.");
       }
     }
 
-    loadFlights();
+    load();
   }, []);
 
-  if (error) {
-    return <p>{error}</p>;
+  async function handleAdvance() {
+    try {
+      setIsAdvancing(true);
+      setError(null);
+
+      const state = await advanceSimulation(10);
+
+      setSimulationTime(state.currentTime);
+
+      await loadFlights();
+    } catch {
+      setError("Unable to advance simulation.");
+    } finally {
+      setIsAdvancing(false);
+    }
   }
 
   return (
     <main>
       <h1>Flights</h1>
+
+      <button
+        onClick={handleAdvance}
+        disabled={isAdvancing}
+      >
+        {isAdvancing
+          ? "Advancing..."
+          : "Advance 10 Minutes"}
+      </button>
+
+      {simulationTime && (
+        <p>
+          Simulation Time:{" "}
+          {new Date(simulationTime).toLocaleString()}
+        </p>
+      )}
+
+      {error && <p>{error}</p>}
 
       <table>
         <thead>
@@ -47,7 +86,9 @@ export function FlightsPage() {
               <td>{flight.origin}</td>
               <td>{flight.destination}</td>
               <td>
-                {new Date(flight.scheduledTime).toLocaleString()}
+                {new Date(
+                  flight.scheduledTime
+                ).toLocaleString()}
               </td>
               <td>{flight.status}</td>
             </tr>

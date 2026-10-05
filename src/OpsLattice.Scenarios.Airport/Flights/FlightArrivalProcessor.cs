@@ -4,6 +4,9 @@ namespace OpsLattice.Scenarios.Airport.Flights;
 
 public sealed class FlightArrivalProcessor
 {
+    private static readonly TimeSpan ApproachDuration =
+        TimeSpan.FromMinutes(10);
+
     private readonly ISimulationClock _clock;
 
     public FlightArrivalProcessor(ISimulationClock clock)
@@ -16,7 +19,16 @@ public sealed class FlightArrivalProcessor
         if (flight.Status == FlightStatus.Scheduled &&
             _clock.CurrentTime >= flight.ScheduledTime)
         {
-            flight.BeginApproach();
+            flight.BeginApproach(_clock.CurrentTime);
+            return;
+        }
+
+        if (flight.Status == FlightStatus.Approaching &&
+            flight.ApproachStartedAt.HasValue &&
+            _clock.CurrentTime >=
+            flight.ApproachStartedAt.Value + ApproachDuration)
+        {
+            flight.Land();
         }
     }
 }

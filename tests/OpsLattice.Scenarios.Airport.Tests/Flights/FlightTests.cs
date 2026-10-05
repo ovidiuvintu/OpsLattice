@@ -51,9 +51,21 @@ public sealed class FlightTests
     {
         var flight = CreateFlight();
 
-        flight.BeginApproach();
+        flight.BeginApproach(flight.ScheduledTime);
 
         Assert.Equal(FlightStatus.Approaching, flight.Status);
+    }
+
+    [Fact]
+    public void BeginApproach_ShouldRecordApproachStartTime()
+    {
+        var flight = CreateFlight();
+
+        var approachTime = flight.ScheduledTime;
+
+        flight.BeginApproach(approachTime);
+
+        Assert.Equal(approachTime, flight.ApproachStartedAt);
     }
 
     [Fact]
@@ -61,7 +73,7 @@ public sealed class FlightTests
     {
         var flight = CreateFlight();
 
-        flight.BeginApproach();
+        flight.BeginApproach(flight.ScheduledTime);
         flight.Land();
 
         Assert.Equal(FlightStatus.Landed, flight.Status);

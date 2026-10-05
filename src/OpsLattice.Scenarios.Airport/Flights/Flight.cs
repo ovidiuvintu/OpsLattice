@@ -14,7 +14,9 @@ public sealed class Flight
 
     public FlightStatus Status { get; private set; } = FlightStatus.Scheduled;
 
-    public void BeginApproach()
+    public DateTimeOffset? ApproachStartedAt { get; private set; }
+
+    public void BeginApproach(DateTimeOffset startedAt)
     {
         if (Status != FlightStatus.Scheduled)
         {
@@ -22,6 +24,7 @@ public sealed class Flight
                 "Only a scheduled flight can begin its approach.");
         }
 
+        ApproachStartedAt = startedAt;
         Status = FlightStatus.Approaching;
     }
 

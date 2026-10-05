@@ -43,6 +43,51 @@ public sealed class FlightArrivalSimulationStepTests
             flight.Status);
     }
 
+    [Fact]
+    public void Advance_AfterApproachDuration_ShouldLandFlight()
+    {
+        var scheduledTime = new DateTimeOffset(
+            2026, 10, 4, 14, 30, 0, TimeSpan.Zero);
+
+        var flight = new Flight
+        {
+            FlightNumber = "UA123",
+            Airline = "United Airlines",
+            Origin = "ORD",
+            Destination = "IAH",
+            ScheduledTime = scheduledTime
+        };
+
+        var provider = new TestFlightProvider([flight]);
+
+        var clock = new SimulationClock(
+            scheduledTime.AddMinutes(-10));
+
+        var processor = new FlightArrivalProcessor(clock);
+
+        var step = new FlightArrivalSimulationStep(
+            provider,
+            processor);
+
+        var runner = new SimulationRunner(
+            clock,
+            [step]);
+
+        // 14:20 → 14:30
+        runner.Advance(TimeSpan.FromMinutes(10));
+
+        Assert.Equal(
+            FlightStatus.Approaching,
+            flight.Status);
+
+        // 14:30 → 14:40
+        runner.Advance(TimeSpan.FromMinutes(10));
+
+        Assert.Equal(
+            FlightStatus.Landed,
+            flight.Status);
+    }
+
     private sealed class TestFlightProvider : IFlightProvider
     {
         private readonly IReadOnlyCollection<Flight> _flights;
