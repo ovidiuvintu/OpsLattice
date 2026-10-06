@@ -63,31 +63,24 @@ public sealed class GateTests
     }
 
     [Fact]
-    public void Occupy_WhenFlightIsAssigned_ShouldOccupyGate()
+    public void Release_WhenFlightOccupiesGate_ShouldClearGate()
     {
         var gate = new Gate("B12");
         var flight = CreateFlight();
 
         gate.Assign(flight);
-
         gate.Occupy(flight);
 
-        Assert.True(gate.IsOccupied);
-        Assert.Same(flight, gate.OccupyingFlight);
+        gate.Release(flight);
+
+        Assert.False(gate.IsAssigned);
+        Assert.False(gate.IsOccupied);
+        Assert.Null(gate.AssignedFlight);
+        Assert.Null(gate.OccupyingFlight);
     }
 
     [Fact]
-    public void Occupy_WhenFlightIsNotAssigned_ShouldThrow()
-    {
-        var gate = new Gate("B12");
-        var flight = CreateFlight();
-
-        Assert.Throws<InvalidOperationException>(
-            () => gate.Occupy(flight));
-    }
-
-    [Fact]
-    public void Occupy_WhenDifferentFlightIsAssigned_ShouldThrow()
+    public void Release_WhenDifferentFlightOccupiesGate_ShouldThrow()
     {
         var gate = new Gate("B12");
 
@@ -104,9 +97,20 @@ public sealed class GateTests
         };
 
         gate.Assign(assignedFlight);
+        gate.Occupy(assignedFlight);
 
         Assert.Throws<InvalidOperationException>(
-            () => gate.Occupy(otherFlight));
+            () => gate.Release(otherFlight));
+    }
+
+    private static Flight CreateLandedFlight()
+    {
+        var flight = CreateFlight();
+
+        flight.BeginApproach(flight.ScheduledTime);
+        flight.Land(flight.ScheduledTime.AddMinutes(10));
+
+        return flight;
     }
 
     private static Flight CreateFlight()

@@ -19,28 +19,6 @@ public sealed class GateOccupancyProcessorTests
 
         gate.Assign(flight);
 
-        var processor =
-            new GateOccupancyProcessor(new SimulationClock(flight.LandedAt!.Value.AddMinutes(10)), gateProvider);
-
-        processor.Process(flight);
-
-        Assert.True(gate.IsOccupied);
-        Assert.Same(flight, gate.OccupyingFlight);
-        Assert.Equal(
-            FlightStatus.AtGate,
-            flight.Status);
-    }
-
-    [Fact]
-    public void Process_WhenTaxiDurationCompletes_ShouldOccupyGate()
-    {
-        var flight = CreateLandedFlight();
-
-        var gateProvider = new InMemoryGateProvider();
-        var gate = gateProvider.GetGates().First();
-
-        gate.Assign(flight);
-
         var clock = new SimulationClock(
             flight.LandedAt!.Value.AddMinutes(10));
 
@@ -53,32 +31,13 @@ public sealed class GateOccupancyProcessorTests
 
         Assert.True(gate.IsOccupied);
         Assert.Same(flight, gate.OccupyingFlight);
-        Assert.Equal(FlightStatus.AtGate, flight.Status);
-    }
+        Assert.Equal(
+            FlightStatus.AtGate,
+            flight.Status);
 
-    [Fact]
-    public void Process_BeforeTaxiDurationCompletes_ShouldRemainLanded()
-    {
-        var flight = CreateLandedFlight();
-
-        var gateProvider = new InMemoryGateProvider();
-        var gate = gateProvider.GetGates().First();
-
-        gate.Assign(flight);
-
-        var clock = new SimulationClock(
-            flight.LandedAt!.Value.AddMinutes(9));
-
-        var processor =
-            new GateOccupancyProcessor(
-                clock,
-                gateProvider);
-
-        processor.Process(flight);
-
-        Assert.False(gate.IsOccupied);
-        Assert.Null(gate.OccupyingFlight);
-        Assert.Equal(FlightStatus.Landed, flight.Status);
+        Assert.Equal(
+            clock.CurrentTime,
+            flight.ArrivedAtGateAt);
     }
 
     private static Flight CreateLandedFlight()

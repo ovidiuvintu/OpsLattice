@@ -20,9 +20,9 @@ public sealed class Gate
 
     public Flight? AssignedFlight { get; private set; }
 
-    public Flight? OccupyingFlight { get; private set; }
-
     public bool IsAssigned => AssignedFlight is not null;
+
+    public Flight? OccupyingFlight { get; private set; }
 
     public bool IsOccupied => OccupyingFlight is not null;
 
@@ -52,5 +52,18 @@ public sealed class Gate
         }
 
         OccupyingFlight = flight;
+    }
+
+    public void Release(Flight flight)
+    {
+        if (AssignedFlight != flight ||
+            OccupyingFlight != flight)
+        {
+            throw new InvalidOperationException(
+                $"Flight {flight.FlightNumber} does not occupy gate {Code}.");
+        }
+
+        OccupyingFlight = null;
+        AssignedFlight = null;
     }
 }

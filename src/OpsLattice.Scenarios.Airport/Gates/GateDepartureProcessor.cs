@@ -3,15 +3,15 @@ using OpsLattice.Simulator.Time;
 
 namespace OpsLattice.Scenarios.Airport.Gates;
 
-public sealed class GateOccupancyProcessor
+public sealed class GateDepartureProcessor
 {
-    private static readonly TimeSpan TaxiDuration =
-        TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan TurnaroundDuration =
+        TimeSpan.FromMinutes(30);
 
     private readonly ISimulationClock _clock;
     private readonly IGateProvider _gateProvider;
 
-    public GateOccupancyProcessor(
+    public GateDepartureProcessor(
         ISimulationClock clock,
         IGateProvider gateProvider)
     {
@@ -21,18 +21,18 @@ public sealed class GateOccupancyProcessor
 
     public void Process(Flight flight)
     {
-        if (flight.Status != FlightStatus.Landed)
+        if (flight.Status != FlightStatus.AtGate)
         {
             return;
         }
 
-        if (!flight.LandedAt.HasValue)
+        if (!flight.ArrivedAtGateAt.HasValue)
         {
             return;
         }
 
         if (_clock.CurrentTime <
-            flight.LandedAt.Value + TaxiDuration)
+            flight.ArrivedAtGateAt.Value + TurnaroundDuration)
         {
             return;
         }
@@ -40,19 +40,14 @@ public sealed class GateOccupancyProcessor
         var gate = _gateProvider
             .GetGates()
             .FirstOrDefault(
-                gate => gate.AssignedFlight == flight);
+                gate => gate.OccupyingFlight == flight);
 
         if (gate is null)
         {
             return;
         }
 
-        if (gate.IsOccupied)
-        {
-            return;
-        }
-
-        gate.Occupy(flight);
-        flight.ArriveAtGate(_clock.CurrentTime);
+        flight.Depart();
+        gate.Release(flight);
     }
 }

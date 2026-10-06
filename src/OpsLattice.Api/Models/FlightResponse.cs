@@ -9,4 +9,5 @@ public sealed record FlightResponse(
     string Status,
     DateTimeOffset? ApproachStartedAt,
     DateTimeOffset? LandedAt,
+    DateTimeOffset? ArrivedAtGateAt,
     string? Gate);
