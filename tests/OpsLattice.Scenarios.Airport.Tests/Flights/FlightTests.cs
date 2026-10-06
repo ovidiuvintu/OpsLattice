@@ -74,7 +74,11 @@ public sealed class FlightTests
         var flight = CreateFlight();
 
         flight.BeginApproach(flight.ScheduledTime);
-        flight.Land();
+
+        var landedAt =
+            flight.ScheduledTime.AddMinutes(10);
+
+        flight.Land(landedAt);
 
         Assert.Equal(FlightStatus.Landed, flight.Status);
     }
@@ -84,9 +88,53 @@ public sealed class FlightTests
     {
         var flight = CreateFlight();
 
-        var action = () => flight.Land();
+        var landedAt =
+            flight.ScheduledTime.AddMinutes(10);
+
+        var action = () => flight.Land(landedAt);
 
         Assert.Throws<InvalidOperationException>(action);
+    }
+
+    [Fact]
+    public void Land_WhenApproaching_ShouldRecordLandingTime()
+    {
+        var flight = CreateFlight();
+
+        flight.BeginApproach(flight.ScheduledTime);
+
+        var landedAt =
+            flight.ScheduledTime.AddMinutes(10);
+
+        flight.Land(landedAt);
+
+        Assert.Equal(landedAt, flight.LandedAt);
+        Assert.Equal(FlightStatus.Landed, flight.Status);
+    }
+
+    [Fact]
+    public void Depart_WhenAtGate_ShouldChangeStatusToDeparted()
+    {
+        var flight = CreateFlight();
+
+        flight.BeginApproach(flight.ScheduledTime);
+        flight.Land(flight.ScheduledTime.AddMinutes(10));
+        flight.ArriveAtGate(flight.ScheduledTime.AddMinutes(20));
+
+        flight.Depart();
+
+        Assert.Equal(
+            FlightStatus.Departed,
+            flight.Status);
+    }
+
+    [Fact]
+    public void Depart_WhenNotAtGate_ShouldThrow()
+    {
+        var flight = CreateFlight();
+
+        Assert.Throws<InvalidOperationException>(
+            () => flight.Depart());
     }
 
     private static Flight CreateFlight()

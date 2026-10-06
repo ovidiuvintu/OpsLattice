@@ -62,12 +62,53 @@ public sealed class GateTests
             () => gate.Assign(secondFlight));
     }
 
+    [Fact]
+    public void Release_WhenFlightOccupiesGate_ShouldClearGate()
+    {
+        var gate = new Gate("B12");
+        var flight = CreateFlight();
+
+        gate.Assign(flight);
+        gate.Occupy(flight);
+
+        gate.Release(flight);
+
+        Assert.False(gate.IsAssigned);
+        Assert.False(gate.IsOccupied);
+        Assert.Null(gate.AssignedFlight);
+        Assert.Null(gate.OccupyingFlight);
+    }
+
+    [Fact]
+    public void Release_WhenDifferentFlightOccupiesGate_ShouldThrow()
+    {
+        var gate = new Gate("B12");
+
+        var assignedFlight = CreateFlight();
+
+        var otherFlight = new Flight
+        {
+            FlightNumber = "DL456",
+            Airline = "Delta Air Lines",
+            Origin = "ATL",
+            Destination = "IAH",
+            ScheduledTime = new DateTimeOffset(
+                2026, 10, 4, 15, 15, 0, TimeSpan.Zero)
+        };
+
+        gate.Assign(assignedFlight);
+        gate.Occupy(assignedFlight);
+
+        Assert.Throws<InvalidOperationException>(
+            () => gate.Release(otherFlight));
+    }
+
     private static Flight CreateLandedFlight()
     {
         var flight = CreateFlight();
 
         flight.BeginApproach(flight.ScheduledTime);
-        flight.Land();
+        flight.Land(flight.ScheduledTime.AddMinutes(10));
 
         return flight;
     }

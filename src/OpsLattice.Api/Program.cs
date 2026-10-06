@@ -39,6 +39,18 @@ builder.Services.AddSingleton<FlightArrivalSimulationStep>();
 builder.Services.AddSingleton<GateAssignmentProcessor>();
 builder.Services.AddSingleton<GateAssignmentSimulationStep>();
 
+builder.Services.AddSingleton<FlightArrivalProcessor>();
+builder.Services.AddSingleton<FlightArrivalSimulationStep>();
+
+builder.Services.AddSingleton<GateAssignmentProcessor>();
+builder.Services.AddSingleton<GateAssignmentSimulationStep>();
+
+builder.Services.AddSingleton<GateOccupancyProcessor>();
+builder.Services.AddSingleton<GateOccupancySimulationStep>();
+
+builder.Services.AddSingleton<GateDepartureProcessor>();
+builder.Services.AddSingleton<GateDepartureSimulationStep>();
+
 // Simulation runner
 builder.Services.AddSingleton<SimulationRunner>(provider =>
 {
@@ -51,13 +63,24 @@ builder.Services.AddSingleton<SimulationRunner>(provider =>
     var arrivalStep =
         provider.GetRequiredService<FlightArrivalSimulationStep>();
 
+    var gateOccupancyStep =
+        provider.GetRequiredService<GateOccupancySimulationStep>();
+
+    var gateDepartureStep =
+        provider.GetRequiredService<GateDepartureSimulationStep>();
+
     return new SimulationRunner(
         clock,
         [
             gateAssignmentStep,
-            arrivalStep
+            arrivalStep,
+            gateOccupancyStep,
+            gateDepartureStep
         ]);
 });
+
+builder.Services.AddSingleton<GateDepartureProcessor>();
+builder.Services.AddSingleton<GateDepartureSimulationStep>();
 
 // Web client
 builder.Services.AddCors(options =>
