@@ -51,13 +51,20 @@ builder.Services.AddSingleton<SimulationRunner>(provider =>
     var arrivalStep =
         provider.GetRequiredService<FlightArrivalSimulationStep>();
 
+    var gateOccupancyStep =
+        provider.GetRequiredService<GateOccupancySimulationStep>();
+
     return new SimulationRunner(
         clock,
         [
             gateAssignmentStep,
-            arrivalStep
+            arrivalStep,
+            gateOccupancyStep
         ]);
 });
+
+builder.Services.AddSingleton<GateOccupancyProcessor>();
+builder.Services.AddSingleton<GateOccupancySimulationStep>();
 
 // Web client
 builder.Services.AddCors(options =>
