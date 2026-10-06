@@ -1,8 +1,20 @@
+
+
+const API_URL = "http://localhost:5160";
+
 export interface SimulationState {
   currentTime: string;
 }
 
-const API_URL = "http://localhost:5160";
+export async function getSimulation(): Promise<SimulationState> {
+  const response = await fetch(`${API_URL}/api/simulation`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load simulation state.");
+  }
+
+  return response.json();
+}
 
 export async function advanceSimulation(
   minutes: number
@@ -23,6 +35,4 @@ export async function advanceSimulation(
   }
 
   return response.json();
-}export interface SimulationState {
-  currentTime: string;
 }
