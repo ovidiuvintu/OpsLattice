@@ -21,7 +21,7 @@ public sealed class FlightsController : ControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IReadOnlyCollection<FlightResponse>> GetFlights()
+    public ActionResult<IReadOnlyCollection<FlightResponse>> Get()
     {
         var gates = _gateProvider.GetGates();
 
@@ -33,18 +33,18 @@ public sealed class FlightsController : ControllerBase
                     gate => gate.AssignedFlight == flight);
 
                 return new FlightResponse(
-                        flight.FlightNumber,
-                        flight.Airline,
-                        flight.Origin,
-                        flight.Destination,
-                        flight.ScheduledTime,
-                        flight.Status.ToString(),
-                        flight.ApproachStartedAt,
-                        flight.LandedAt,
-                        flight.ArrivedAtGateAt,
-                        gate?.Code);
-                                })
-                            .ToArray();
+                    flight.FlightNumber,
+                    flight.Airline,
+                    flight.Origin,
+                    flight.Destination,
+                    flight.ScheduledTime,
+                    flight.Status.ToString(),
+                    flight.ApproachStartedAt,
+                    flight.LandedAt,
+                    flight.ArrivedAtGateAt,
+                    gate?.Code);
+            })
+            .ToArray();
 
         return Ok(flights);
     }

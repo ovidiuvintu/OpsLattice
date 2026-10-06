@@ -20,8 +20,16 @@ public sealed class SimulationController : ControllerBase
         _clock = clock;
     }
 
+    [HttpGet]
+    public ActionResult<SimulationResponse> Get()
+    {
+        return Ok(
+            new SimulationResponse(
+                _clock.CurrentTime));
+    }
+
     [HttpPost("advance")]
-    public IActionResult Advance(
+    public ActionResult<SimulationResponse> Advance(
         AdvanceSimulationRequest request)
     {
         if (request.Minutes <= 0)
@@ -33,9 +41,8 @@ public sealed class SimulationController : ControllerBase
         _runner.Advance(
             TimeSpan.FromMinutes(request.Minutes));
 
-        return Ok(new
-        {
-            currentTime = _clock.CurrentTime
-        });
+        return Ok(
+            new SimulationResponse(
+                _clock.CurrentTime));
     }
 }
