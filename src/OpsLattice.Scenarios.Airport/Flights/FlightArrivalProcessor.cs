@@ -28,7 +28,7 @@ public sealed class FlightArrivalProcessor
             _clock.CurrentTime >=
             flight.ApproachStartedAt.Value + ApproachDuration)
         {
-            flight.Land();
+            flight.Land(_clock.CurrentTime);
         }
     }
 }

@@ -40,9 +40,9 @@ public sealed class FlightsController : ControllerBase
                     flight.ScheduledTime,
                     flight.Status.ToString(),
                     flight.ApproachStartedAt,
+                    flight.LandedAt,
                     gate?.Code);
-            })
-            .ToArray();
+                            }).ToArray();
 
         return Ok(flights);
     }
