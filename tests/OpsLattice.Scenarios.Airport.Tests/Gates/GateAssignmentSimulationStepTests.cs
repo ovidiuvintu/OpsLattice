@@ -56,7 +56,59 @@ public sealed class GateAssignmentSimulationStepTests
             gate => gate.AssignedFlight == flight);
     }
 
-    private sealed class TestFlightProvider : IFlightProvider
+    [Fact]
+    public void GetNextExecutionTime_WhenFlightEntersAssignmentHorizon_ShouldReturnHorizonStart()
+    {
+        var scheduledTime = new DateTimeOffset(
+            2026, 10, 4, 15, 15, 0, TimeSpan.Zero);
+
+        var flight = new Flight
+        {
+            FlightNumber = "DL456",
+            Airline = "Delta Air Lines",
+            Origin = "ATL",
+            Destination = "IAH",
+            ScheduledTime = scheduledTime
+        };
+
+        var flightProvider =
+            new TestFlightProvider([flight]);
+
+        var gateProvider =
+            new InMemoryGateProvider();
+
+        var clock =
+            new SimulationClock(
+                new DateTimeOffset(
+                    2026, 10, 4, 14, 0, 0, TimeSpan.Zero));
+
+        var processor =
+            new GateAssignmentProcessor(
+                clock,
+                gateProvider);
+
+        var step =
+            new GateAssignmentSimulationStep(
+                flightProvider,
+                processor);
+
+        var targetTime =
+            new DateTimeOffset(
+                2026, 10, 4, 14, 30, 0, TimeSpan.Zero);
+
+        var nextExecutionTime =
+            step.GetNextExecutionTime(
+                clock.CurrentTime,
+                targetTime);
+
+        Assert.Equal(
+            new DateTimeOffset(
+                2026, 10, 4, 14, 15, 0, TimeSpan.Zero),
+            nextExecutionTime);
+    }
+
+    private sealed class TestFlightProvider
+        : IFlightProvider
     {
         private readonly IReadOnlyCollection<Flight> _flights;
 

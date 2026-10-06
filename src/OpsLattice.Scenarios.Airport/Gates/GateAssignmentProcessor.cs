@@ -53,4 +53,16 @@ public sealed class GateAssignmentProcessor
 
         gate.Assign(flight);
     }
+
+    public DateTimeOffset? GetNextExecutionTime(
+        Flight flight)
+    {
+        if (flight.Status != FlightStatus.Scheduled)
+        {
+            return null;
+        }
+
+        return flight.ScheduledTime -
+               AssignmentHorizon;
+    }
 }
