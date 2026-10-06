@@ -19,6 +19,18 @@ public sealed class GateOccupancyProcessor
         _gateProvider = gateProvider;
     }
 
+    public DateTimeOffset? GetNextExecutionTime(
+        Flight flight)
+    {
+        if (flight.Status != FlightStatus.Landed ||
+            !flight.LandedAt.HasValue)
+        {
+            return null;
+        }
+
+        return flight.LandedAt.Value + TaxiDuration;
+    }
+
     public void Process(Flight flight)
     {
         if (flight.Status != FlightStatus.Landed)

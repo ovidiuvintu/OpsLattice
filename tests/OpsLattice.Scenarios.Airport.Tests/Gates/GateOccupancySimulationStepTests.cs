@@ -109,6 +109,61 @@ public sealed class GateOccupancySimulationStepTests
             gates[1].OccupyingFlight);
     }
 
+    [Fact]
+    public void GetNextExecutionTime_WhenFlightHasLanded_ShouldReturnTaxiCompletionTime()
+    {
+        var scheduledTime = new DateTimeOffset(
+            2026, 10, 4, 15, 15, 0, TimeSpan.Zero);
+
+        var landedAt = new DateTimeOffset(
+            2026, 10, 4, 15, 25, 0, TimeSpan.Zero);
+
+        var flight = new Flight
+        {
+            FlightNumber = "DL456",
+            Airline = "Delta Air Lines",
+            Origin = "ATL",
+            Destination = "IAH",
+            ScheduledTime = scheduledTime
+        };
+
+        flight.BeginApproach(scheduledTime);
+        flight.Land(landedAt);
+
+        var flightProvider =
+            new TestFlightProvider([flight]);
+
+        var gateProvider =
+            new InMemoryGateProvider();
+
+        var clock =
+            new SimulationClock(landedAt);
+
+        var processor =
+            new GateOccupancyProcessor(
+                clock,
+                gateProvider);
+
+        var step =
+            new GateOccupancySimulationStep(
+                flightProvider,
+                processor);
+
+        var targetTime =
+            new DateTimeOffset(
+                2026, 10, 4, 16, 0, 0, TimeSpan.Zero);
+
+        var nextExecutionTime =
+            step.GetNextExecutionTime(
+                clock.CurrentTime,
+                targetTime);
+
+        Assert.Equal(
+            new DateTimeOffset(
+                2026, 10, 4, 15, 35, 0, TimeSpan.Zero),
+            nextExecutionTime);
+    }
+
     private static Flight CreateLandedFlight()
     {
         return CreateLandedFlight(

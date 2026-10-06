@@ -19,6 +19,19 @@ public sealed class GateDepartureProcessor
         _gateProvider = gateProvider;
     }
 
+    public DateTimeOffset? GetNextExecutionTime(
+        Flight flight)
+    {
+        if (flight.Status != FlightStatus.AtGate ||
+            !flight.ArrivedAtGateAt.HasValue)
+        {
+            return null;
+        }
+
+        return flight.ArrivedAtGateAt.Value +
+               TurnaroundDuration;
+    }
+
     public void Process(Flight flight)
     {
         if (flight.Status != FlightStatus.AtGate)
