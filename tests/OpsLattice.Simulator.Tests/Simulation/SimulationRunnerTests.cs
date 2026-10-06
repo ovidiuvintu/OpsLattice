@@ -9,7 +9,7 @@ public sealed class SimulationRunnerTests
     public void Advance_ShouldAdvanceSimulationClock()
     {
         var startTime = new DateTimeOffset(
-            2026, 10, 4, 14, 0, 0, TimeSpan.Zero);
+            2026, 10, 4, 14, 20, 0, TimeSpan.Zero);
 
         var clock = new SimulationClock(startTime);
 
@@ -27,9 +27,10 @@ public sealed class SimulationRunnerTests
     [Fact]
     public void Advance_ShouldExecuteSimulationSteps()
     {
-        var clock = new SimulationClock(
-            new DateTimeOffset(
-                2026, 10, 4, 14, 0, 0, TimeSpan.Zero));
+        var startTime = new DateTimeOffset(
+            2026, 10, 4, 14, 20, 0, TimeSpan.Zero);
+
+        var clock = new SimulationClock(startTime);
 
         var step = new TestSimulationStep();
 
@@ -37,18 +38,94 @@ public sealed class SimulationRunnerTests
             clock,
             [step]);
 
-        runner.Advance(TimeSpan.FromMinutes(1));
+        runner.Advance(TimeSpan.FromMinutes(10));
 
-        Assert.True(step.WasExecuted);
+        Assert.Equal(1, step.ExecutionCount);
+    }
+
+    [Fact]
+    public void Advance_ShouldExecuteScheduledStepAtItsEventTime()
+    {
+        var startTime = new DateTimeOffset(
+            2026, 10, 4, 14, 50, 0, TimeSpan.Zero);
+
+        var eventTime = new DateTimeOffset(
+            2026, 10, 4, 15, 15, 0, TimeSpan.Zero);
+
+        var clock = new SimulationClock(startTime);
+
+        var step = new TestScheduledSimulationStep(
+            clock,
+            eventTime);
+
+        var runner = new SimulationRunner(
+            clock,
+            [step]);
+
+        runner.Advance(TimeSpan.FromMinutes(30));
+
+        Assert.Contains(
+            eventTime,
+            step.ExecutionTimes);
+
+        Assert.Equal(
+            startTime.AddMinutes(30),
+            clock.CurrentTime);
     }
 
     private sealed class TestSimulationStep : ISimulationStep
     {
-        public bool WasExecuted { get; private set; }
+        public int ExecutionCount { get; private set; }
 
         public void Execute()
         {
-            WasExecuted = true;
+            ExecutionCount++;
+        }
+    }
+
+    private sealed class TestScheduledSimulationStep
+        : IScheduledSimulationStep
+    {
+        private readonly ISimulationClock _clock;
+        private readonly DateTimeOffset _eventTime;
+        private bool _eventProcessed;
+
+        public TestScheduledSimulationStep(
+            ISimulationClock clock,
+            DateTimeOffset eventTime)
+        {
+            _clock = clock;
+            _eventTime = eventTime;
+        }
+
+        public List<DateTimeOffset> ExecutionTimes { get; } = [];
+
+        public DateTimeOffset? GetNextExecutionTime(
+            DateTimeOffset currentTime,
+            DateTimeOffset targetTime)
+        {
+            if (_eventProcessed)
+            {
+                return null;
+            }
+
+            if (_eventTime > currentTime &&
+                _eventTime <= targetTime)
+            {
+                return _eventTime;
+            }
+
+            return null;
+        }
+
+        public void Execute()
+        {
+            ExecutionTimes.Add(_clock.CurrentTime);
+
+            if (_clock.CurrentTime == _eventTime)
+            {
+                _eventProcessed = true;
+            }
         }
     }
 }

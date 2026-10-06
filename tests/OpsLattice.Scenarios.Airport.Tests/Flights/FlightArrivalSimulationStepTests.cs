@@ -88,6 +88,83 @@ public sealed class FlightArrivalSimulationStepTests
             flight.Status);
     }
 
+    [Fact]
+    public void GetNextExecutionTime_ShouldReturnEarliestScheduledFlightWithinWindow()
+    {
+        var flightProvider = new InMemoryFlightProvider();
+
+        var clock = new SimulationClock(
+            new DateTimeOffset(
+                2026, 10, 4, 14, 50, 0, TimeSpan.Zero));
+
+        var processor =
+            new FlightArrivalProcessor(clock);
+
+        var step =
+            new FlightArrivalSimulationStep(
+                flightProvider,
+                processor);
+
+        var targetTime =
+            new DateTimeOffset(
+                2026, 10, 4, 15, 20, 0, TimeSpan.Zero);
+
+        var nextExecutionTime =
+            step.GetNextExecutionTime(
+                clock.CurrentTime,
+                targetTime);
+
+        Assert.Equal(
+            new DateTimeOffset(
+                2026, 10, 4, 15, 15, 0, TimeSpan.Zero),
+            nextExecutionTime);
+    }
+
+    [Fact]
+    public void SimulationRunner_WhenAdvancingPastScheduledTime_ShouldBeginApproachAtScheduledTime()
+    {
+        var flightProvider = new InMemoryFlightProvider();
+
+        var startTime = new DateTimeOffset(
+            2026, 10, 4, 14, 50, 0, TimeSpan.Zero);
+
+        var clock = new SimulationClock(startTime);
+
+        var processor =
+            new FlightArrivalProcessor(clock);
+
+        var step =
+            new FlightArrivalSimulationStep(
+                flightProvider,
+                processor);
+
+        var runner = new SimulationRunner(
+            clock,
+            [step]);
+
+        runner.Advance(
+            TimeSpan.FromMinutes(30));
+
+        var flight = flightProvider
+            .GetFlights()
+            .Single(flight =>
+                flight.FlightNumber == "DL456");
+
+        Assert.Equal(
+            FlightStatus.Approaching,
+            flight.Status);
+
+        Assert.Equal(
+            new DateTimeOffset(
+                2026, 10, 4, 15, 15, 0, TimeSpan.Zero),
+            flight.ApproachStartedAt);
+
+        Assert.Equal(
+            new DateTimeOffset(
+                2026, 10, 4, 15, 20, 0, TimeSpan.Zero),
+            clock.CurrentTime);
+    }
+
     private sealed class TestFlightProvider : IFlightProvider
     {
         private readonly IReadOnlyCollection<Flight> _flights;
@@ -102,5 +179,55 @@ public sealed class FlightArrivalSimulationStepTests
         {
             return _flights;
         }
+    }
+
+    [Fact]
+    public void SimulationRunner_WhenAdvancingPastApproachAndLanding_ShouldLandAtCorrectTime()
+    {
+        var flightProvider = new InMemoryFlightProvider();
+
+        var startTime = new DateTimeOffset(
+            2026, 10, 4, 14, 50, 0, TimeSpan.Zero);
+
+        var clock = new SimulationClock(startTime);
+
+        var processor =
+            new FlightArrivalProcessor(clock);
+
+        var step =
+            new FlightArrivalSimulationStep(
+                flightProvider,
+                processor);
+
+        var runner = new SimulationRunner(
+            clock,
+            [step]);
+
+        runner.Advance(
+            TimeSpan.FromMinutes(40));
+
+        var flight = flightProvider
+            .GetFlights()
+            .Single(flight =>
+                flight.FlightNumber == "DL456");
+
+        Assert.Equal(
+            FlightStatus.Landed,
+            flight.Status);
+
+        Assert.Equal(
+            new DateTimeOffset(
+                2026, 10, 4, 15, 15, 0, TimeSpan.Zero),
+            flight.ApproachStartedAt);
+
+        Assert.Equal(
+            new DateTimeOffset(
+                2026, 10, 4, 15, 25, 0, TimeSpan.Zero),
+            flight.LandedAt);
+
+        Assert.Equal(
+            new DateTimeOffset(
+                2026, 10, 4, 15, 30, 0, TimeSpan.Zero),
+            clock.CurrentTime);
     }
 }
