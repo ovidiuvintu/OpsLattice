@@ -53,7 +53,8 @@ public sealed class GateTests
             Origin = "ATL",
             Destination = "IAH",
             ScheduledTime = new DateTimeOffset(
-                2026, 10, 4, 15, 15, 0, TimeSpan.Zero)
+                2026, 10, 4, 15, 15, 0, TimeSpan.Zero),
+            Type = FlightType.Arrival
         };
 
         gate.Assign(firstFlight);
@@ -93,7 +94,8 @@ public sealed class GateTests
             Origin = "ATL",
             Destination = "IAH",
             ScheduledTime = new DateTimeOffset(
-                2026, 10, 4, 15, 15, 0, TimeSpan.Zero)
+                2026, 10, 4, 15, 15, 0, TimeSpan.Zero),
+            Type = FlightType.Arrival
         };
 
         gate.Assign(assignedFlight);
@@ -122,7 +124,8 @@ public sealed class GateTests
             Origin = "ORD",
             Destination = "IAH",
             ScheduledTime = new DateTimeOffset(
-                2026, 10, 4, 14, 30, 0, TimeSpan.Zero)
+                2026, 10, 4, 14, 30, 0, TimeSpan.Zero),
+            Type = FlightType.Arrival
         };
     }
 }

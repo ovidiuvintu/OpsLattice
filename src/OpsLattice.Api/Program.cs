@@ -3,6 +3,8 @@ using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Gates;
 using OpsLattice.Simulator.Simulation;
 using OpsLattice.Simulator.Time;
+using OpsLattice.Api.Infrastructure.Scheduling;
+using OpsLattice.Scenarios.Airport.Scheduling;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,13 +19,24 @@ builder.Services
 builder.Services.AddOpenApi();
 
 // Airport data providers
-builder.Services.AddSingleton<IFlightProvider, InMemoryFlightProvider>();
+builder.Services.AddSingleton<IFlightProvider>(provider =>
+{
+    var loader = provider
+        .GetRequiredService<IFlightScheduleLoader>();
+
+    var scheduleDate = new DateOnly(2026, 10, 6);
+
+    var flights = loader.Load(scheduleDate);
+
+    return new InMemoryFlightProvider(flights);
+}); 
+
 builder.Services.AddSingleton<IGateProvider, InMemoryGateProvider>();
 
 // Simulation clock
 var simulationStartTime =
     new DateTimeOffset(
-        2026, 10, 4, 14, 20, 0, TimeSpan.Zero);
+        2026, 10, 6, 0, 0, 0, TimeSpan.Zero);
 
 builder.Services.AddSingleton(
     new SimulationClock(simulationStartTime));
@@ -82,6 +95,16 @@ builder.Services.AddSingleton<SimulationRunner>(provider =>
 builder.Services.AddSingleton<GateDepartureProcessor>();
 builder.Services.AddSingleton<GateDepartureSimulationStep>();
 
+builder.Services.AddSingleton<FlightDepartureProcessor>();
+builder.Services.AddSingleton<FlightDepartureSimulationStep>();
+
+builder.Services.AddSingleton<IFlightScheduleLoader>(
+    _ => new ExcelFlightScheduleLoader(
+        Path.Combine(
+            builder.Environment.ContentRootPath,
+            "Data",
+            "OpsLattice_ATL_Daily_Flight_Schedule_2150.xlsx")));
+
 // Web client
 builder.Services.AddCors(options =>
 {
@@ -95,6 +118,24 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var loader = scope.ServiceProvider
+        .GetRequiredService<IFlightScheduleLoader>();
+
+    var flights = loader.Load(
+        new DateOnly(2026, 10, 6));
+
+    Console.WriteLine(
+        $"Loaded {flights.Count} flights.");
+
+    Console.WriteLine(
+        $"Arrivals: {flights.Count(f => f.Type == FlightType.Arrival)}");
+
+    Console.WriteLine(
+        $"Departures: {flights.Count(f => f.Type == FlightType.Departure)}");
+}
 
 if (app.Environment.IsDevelopment())
 {

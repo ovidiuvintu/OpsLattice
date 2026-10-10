@@ -24,7 +24,8 @@ public sealed class AirportSimulationLifecycleTests
             Airline = "Delta Air Lines",
             Origin = "ATL",
             Destination = "IAH",
-            ScheduledTime = scheduledTime
+            ScheduledTime = scheduledTime,
+            Type = FlightType.Arrival
         };
 
         var flightProvider =

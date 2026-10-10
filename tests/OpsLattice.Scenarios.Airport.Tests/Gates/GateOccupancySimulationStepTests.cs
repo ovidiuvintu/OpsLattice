@@ -124,7 +124,8 @@ public sealed class GateOccupancySimulationStepTests
             Airline = "Delta Air Lines",
             Origin = "ATL",
             Destination = "IAH",
-            ScheduledTime = scheduledTime
+            ScheduledTime = scheduledTime,
+            Type = FlightType.Arrival
         };
 
         flight.BeginApproach(scheduledTime);
@@ -182,7 +183,8 @@ public sealed class GateOccupancySimulationStepTests
             Airline = "Test Airline",
             Origin = "ORD",
             Destination = "IAH",
-            ScheduledTime = scheduledTime
+            ScheduledTime = scheduledTime,
+            Type = FlightType.Arrival
         };
 
         flight.BeginApproach(

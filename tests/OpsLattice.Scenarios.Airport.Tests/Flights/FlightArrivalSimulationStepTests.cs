@@ -18,7 +18,8 @@ public sealed class FlightArrivalSimulationStepTests
             Airline = "United Airlines",
             Origin = "ORD",
             Destination = "IAH",
-            ScheduledTime = scheduledTime
+            ScheduledTime = scheduledTime,
+            Type = FlightType.Arrival
         };
 
         var provider = new TestFlightProvider([flight]);
@@ -55,7 +56,8 @@ public sealed class FlightArrivalSimulationStepTests
             Airline = "United Airlines",
             Origin = "ORD",
             Destination = "IAH",
-            ScheduledTime = scheduledTime
+            ScheduledTime = scheduledTime,
+            Type = FlightType.Arrival
         };
 
         var provider = new TestFlightProvider([flight]);
@@ -91,7 +93,19 @@ public sealed class FlightArrivalSimulationStepTests
     [Fact]
     public void GetNextExecutionTime_ShouldReturnEarliestScheduledFlightWithinWindow()
     {
-        var flightProvider = new InMemoryFlightProvider();
+        var flightProvider = new InMemoryFlightProvider(new[]
+        {
+            new Flight
+            {
+                FlightNumber = "DL456",
+                Airline = "Delta Air Lines",
+                Origin = "ATL",
+                Destination = "IAH",
+                ScheduledTime = new DateTimeOffset(
+                    2026, 10, 4, 15, 15, 0, TimeSpan.Zero),
+                Type = FlightType.Arrival
+            }
+        });
 
         var clock = new SimulationClock(
             new DateTimeOffset(
@@ -123,7 +137,19 @@ public sealed class FlightArrivalSimulationStepTests
     [Fact]
     public void SimulationRunner_WhenAdvancingPastScheduledTime_ShouldBeginApproachAtScheduledTime()
     {
-        var flightProvider = new InMemoryFlightProvider();
+        var flightProvider = new InMemoryFlightProvider(new[]
+        {
+            new Flight
+            {
+                FlightNumber = "DL456",
+                Airline = "Delta Air Lines",
+                Origin = "ATL",
+                Destination = "IAH",
+                ScheduledTime = new DateTimeOffset(
+                    2026, 10, 4, 15, 15, 0, TimeSpan.Zero),
+                Type = FlightType.Arrival
+            }
+        });
 
         var startTime = new DateTimeOffset(
             2026, 10, 4, 14, 50, 0, TimeSpan.Zero);
@@ -184,7 +210,19 @@ public sealed class FlightArrivalSimulationStepTests
     [Fact]
     public void SimulationRunner_WhenAdvancingPastApproachAndLanding_ShouldLandAtCorrectTime()
     {
-        var flightProvider = new InMemoryFlightProvider();
+        var flightProvider = new InMemoryFlightProvider(new[]
+        {
+            new Flight
+            {
+                FlightNumber = "DL456",
+                Airline = "Delta Air Lines",
+                Origin = "ATL",
+                Destination = "IAH",
+                ScheduledTime = new DateTimeOffset(
+                    2026, 10, 4, 15, 15, 0, TimeSpan.Zero),
+                Type = FlightType.Arrival
+            }
+        });
 
         var startTime = new DateTimeOffset(
             2026, 10, 4, 14, 50, 0, TimeSpan.Zero);

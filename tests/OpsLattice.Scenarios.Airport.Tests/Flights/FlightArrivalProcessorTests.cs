@@ -46,7 +46,8 @@ public sealed class FlightArrivalProcessorTests
             Airline = "United Airlines",
             Origin = "ORD",
             Destination = "IAH",
-            ScheduledTime = scheduledTime
+            ScheduledTime = scheduledTime,
+            Type = FlightType.Arrival
         };
     }
 }

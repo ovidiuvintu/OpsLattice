@@ -20,6 +20,8 @@ public sealed class Flight
 
     public DateTimeOffset? ArrivedAtGateAt { get; private set; }
 
+    public required FlightType Type { get; init; }
+
     public void BeginApproach(DateTimeOffset startedAt)
     {
         if (Status != FlightStatus.Scheduled)
@@ -57,12 +59,57 @@ public sealed class Flight
 
     public void Depart()
     {
-        if (Status != FlightStatus.AtGate)
+        var canDepart = Type switch
+        {
+            FlightType.Arrival =>
+                Status == FlightStatus.AtGate,
+
+            FlightType.Departure =>
+                Status == FlightStatus.ReadyForDeparture,
+
+            _ => false
+        };
+
+        if (!canDepart)
         {
             throw new InvalidOperationException(
-                "A flight must be at a gate before it can depart.");
+                "Flight is not ready to depart.");
         }
 
         Status = FlightStatus.Departed;
+    }
+
+    public void BeginBoarding()
+    {
+        if (Type != FlightType.Departure)
+        {
+            throw new InvalidOperationException(
+                "Only departure flights can begin boarding.");
+        }
+
+        if (Status != FlightStatus.Scheduled)
+        {
+            throw new InvalidOperationException(
+                "Only scheduled flights can begin boarding.");
+        }
+
+        Status = FlightStatus.Boarding;
+    }
+
+    public void CompleteBoarding()
+    {
+        if (Type != FlightType.Departure)
+        {
+            throw new InvalidOperationException(
+                "Only departure flights can complete boarding.");
+        }
+
+        if (Status != FlightStatus.Boarding)
+        {
+            throw new InvalidOperationException(
+                "A flight must be boarding before boarding can complete.");
+        }
+
+        Status = FlightStatus.ReadyForDeparture;
     }
 }

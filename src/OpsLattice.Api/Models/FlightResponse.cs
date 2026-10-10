@@ -3,6 +3,7 @@
 public sealed record FlightResponse(
     string FlightNumber,
     string Airline,
+    string Type,
     string Origin,
     string Destination,
     DateTimeOffset ScheduledTime,

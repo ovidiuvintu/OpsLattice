@@ -16,6 +16,11 @@ public sealed class FlightArrivalProcessor
 
     public void Process(Flight flight)
     {
+        if (flight.Type != FlightType.Arrival)
+        {
+            return;
+        }
+
         if (flight.Status == FlightStatus.Scheduled &&
             _clock.CurrentTime >= flight.ScheduledTime)
         {
