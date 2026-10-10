@@ -35,7 +35,7 @@ public sealed class GateDepartureSimulationStepTests
             TimeSpan.FromMinutes(50));
 
         var flightProvider =
-            new TestFlightProvider([flight]);
+            new TestFlightProvider(new[] { flight });
 
         var processor =
             new GateDepartureProcessor(
@@ -100,7 +100,7 @@ public sealed class GateDepartureSimulationStepTests
 
         var flightProvider =
             new TestFlightProvider(
-                [firstFlight, secondFlight]);
+                new[] { firstFlight, secondFlight });
 
         var processor =
             new GateDepartureProcessor(
@@ -147,7 +147,8 @@ public sealed class GateDepartureSimulationStepTests
             Airline = "Delta Air Lines",
             Origin = "ATL",
             Destination = "IAH",
-            ScheduledTime = scheduledTime
+            ScheduledTime = scheduledTime,
+            Type = FlightType.Arrival
         };
 
         flight.BeginApproach(scheduledTime);
@@ -194,11 +195,12 @@ public sealed class GateDepartureSimulationStepTests
         return new Flight
         {
             FlightNumber = flightNumber,
-            Airline = "Test Airline",
+            Airline = "United Airlines",
             Origin = "ORD",
             Destination = "IAH",
             ScheduledTime = new DateTimeOffset(
-                2026, 10, 4, 14, 30, 0, TimeSpan.Zero)
+                2026, 10, 4, 14, 30, 0, TimeSpan.Zero),
+            Type = FlightType.Arrival
         };
     }
 

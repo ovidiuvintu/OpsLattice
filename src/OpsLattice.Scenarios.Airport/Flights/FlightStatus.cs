@@ -6,6 +6,8 @@ public enum FlightStatus
     Approaching,
     Landed,
     AtGate,
+    Boarding,
+    ReadyForDeparture,
     Departed,
     Delayed,
     Cancelled

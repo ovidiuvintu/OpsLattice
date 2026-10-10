@@ -1,19 +1,20 @@
 ﻿using OpsLattice.Simulator.Simulation;
 
+
 namespace OpsLattice.Scenarios.Airport.Flights;
 
-public sealed class FlightArrivalSimulationStep
+public sealed class FlightDepartureSimulationStep
     : IScheduledSimulationStep
 {
     private readonly IFlightProvider _flightProvider;
-    private readonly FlightArrivalProcessor _arrivalProcessor;
+    private readonly FlightDepartureProcessor _processor;
 
-    public FlightArrivalSimulationStep(
+    public FlightDepartureSimulationStep(
         IFlightProvider flightProvider,
-        FlightArrivalProcessor arrivalProcessor)
+        FlightDepartureProcessor processor)
     {
         _flightProvider = flightProvider;
-        _arrivalProcessor = arrivalProcessor;
+        _processor = processor;
     }
 
     public DateTimeOffset? GetNextExecutionTime(
@@ -25,14 +26,10 @@ public sealed class FlightArrivalSimulationStep
         foreach (var flight in _flightProvider.GetFlights())
         {
             var candidate =
-                GetNextExecutionTime(flight);
+                _processor.GetNextExecutionTime(flight);
 
-            if (!candidate.HasValue)
-            {
-                continue;
-            }
-
-            if (candidate.Value <= currentTime ||
+            if (!candidate.HasValue ||
+                candidate.Value <= currentTime ||
                 candidate.Value > targetTime)
             {
                 continue;
@@ -48,33 +45,11 @@ public sealed class FlightArrivalSimulationStep
         return nextExecutionTime;
     }
 
-    private static DateTimeOffset? GetNextExecutionTime(
-        Flight flight)
-    {
-        if (flight.Type != FlightType.Arrival)
-        {
-            return null;
-        }
-
-        return flight.Status switch
-        {
-            FlightStatus.Scheduled =>
-                flight.ScheduledTime,
-
-            FlightStatus.Approaching
-                when flight.ApproachStartedAt.HasValue =>
-                    flight.ApproachStartedAt.Value
-                        .AddMinutes(10),
-
-            _ => null
-        };
-    }
-
     public void Execute()
     {
         foreach (var flight in _flightProvider.GetFlights())
         {
-            _arrivalProcessor.Process(flight);
+            _processor.Process(flight);
         }
     }
 }

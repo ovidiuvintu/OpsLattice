@@ -19,10 +19,10 @@ public sealed class GateDepartureProcessor
         _gateProvider = gateProvider;
     }
 
-    public DateTimeOffset? GetNextExecutionTime(
-        Flight flight)
+    public DateTimeOffset? GetNextExecutionTime(Flight flight)
     {
-        if (flight.Status != FlightStatus.AtGate ||
+        if (flight.Type != FlightType.Arrival ||
+            flight.Status != FlightStatus.AtGate ||
             !flight.ArrivedAtGateAt.HasValue)
         {
             return null;
@@ -34,7 +34,8 @@ public sealed class GateDepartureProcessor
 
     public void Process(Flight flight)
     {
-        if (flight.Status != FlightStatus.AtGate)
+        if (flight.Type != FlightType.Arrival ||
+            flight.Status != FlightStatus.AtGate)
         {
             return;
         }

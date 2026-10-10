@@ -15,7 +15,8 @@ public sealed class FlightTests
             Origin = "ORD",
             Destination = "IAH",
             ScheduledTime = new DateTimeOffset(
-                2026, 10, 4, 14, 30, 0, TimeSpan.Zero)
+                2026, 10, 4, 14, 30, 0, TimeSpan.Zero),
+            Type = FlightType.Arrival
         };
 
         // Assert
@@ -35,7 +36,8 @@ public sealed class FlightTests
             Airline = "United Airlines",
             Origin = "ORD",
             Destination = "IAH",
-            ScheduledTime = scheduledTime
+            ScheduledTime = scheduledTime,
+            Type = FlightType.Arrival
         };
 
         // Assert
@@ -137,6 +139,42 @@ public sealed class FlightTests
             () => flight.Depart());
     }
 
+    [Fact]
+    public void Flight_ShouldPreserveArrivalType()
+    {
+        var flight = new Flight
+        {
+            FlightNumber = "UA123",
+            Airline = "United Airlines",
+            Origin = "ORD",
+            Destination = "IAH",
+            ScheduledTime = DateTimeOffset.UtcNow,
+            Type = FlightType.Arrival
+        };
+
+        Assert.Equal(
+            FlightType.Arrival,
+            flight.Type);
+    }
+
+    [Fact]
+    public void Flight_ShouldPreserveDepartureType()
+    {
+        var flight = new Flight
+        {
+            FlightNumber = "UA555",
+            Airline = "United Airlines",
+            Origin = "IAH",
+            Destination = "DEN",
+            ScheduledTime = DateTimeOffset.UtcNow,
+            Type = FlightType.Departure
+        };
+
+        Assert.Equal(
+            FlightType.Departure,
+            flight.Type);
+    }
+
     private static Flight CreateFlight()
     {
         return new Flight
@@ -146,7 +184,8 @@ public sealed class FlightTests
             Origin = "ORD",
             Destination = "IAH",
             ScheduledTime = new DateTimeOffset(
-                2026, 10, 4, 14, 30, 0, TimeSpan.Zero)
+                2026, 10, 4, 14, 30, 0, TimeSpan.Zero),
+            Type = FlightType.Arrival
         };
     }
 }

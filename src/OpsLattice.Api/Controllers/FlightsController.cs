@@ -35,6 +35,7 @@ public sealed class FlightsController : ControllerBase
                 return new FlightResponse(
                     flight.FlightNumber,
                     flight.Airline,
+                    flight.Type.ToString(),
                     flight.Origin,
                     flight.Destination,
                     flight.ScheduledTime,

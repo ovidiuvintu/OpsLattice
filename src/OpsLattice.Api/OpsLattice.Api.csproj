@@ -1,11 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\OpsLattice.Scenarios.Airport\OpsLattice.Scenarios.Airport.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Data\OpsLattice_ATL_Daily_Flight_Schedule_2150.xlsx"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  
+
 
 </Project>

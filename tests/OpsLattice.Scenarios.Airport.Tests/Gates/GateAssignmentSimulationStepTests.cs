@@ -19,7 +19,8 @@ public sealed class GateAssignmentSimulationStepTests
             Airline = "United Airlines",
             Origin = "ORD",
             Destination = "IAH",
-            ScheduledTime = scheduledTime
+            ScheduledTime = scheduledTime,
+            Type = FlightType.Arrival
         };
 
         var flightProvider =
@@ -68,7 +69,8 @@ public sealed class GateAssignmentSimulationStepTests
             Airline = "Delta Air Lines",
             Origin = "ATL",
             Destination = "IAH",
-            ScheduledTime = scheduledTime
+            ScheduledTime = scheduledTime,
+            Type = FlightType.Arrival
         };
 
         var flightProvider =
