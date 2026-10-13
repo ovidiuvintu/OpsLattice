@@ -51,7 +51,27 @@ public sealed class GateAssignmentSimulationStep
 
     public void Execute()
     {
-        foreach (var flight in _flightProvider.GetFlights())
+        var flights = _flightProvider.GetFlights();
+
+        // First priority: aircraft that have already landed.
+        var waitingFlights = flights
+            .Where(f =>
+                f.Type == FlightType.Arrival &&
+                f.Status == FlightStatus.Landed &&
+                f.LandedAt.HasValue)
+            .OrderBy(f => f.LandedAt!.Value)
+            .ThenBy(f => f.FlightNumber, StringComparer.Ordinal);
+
+        foreach (var flight in waitingFlights)
+        {
+            _processor.Process(flight);
+        }
+
+        // Preserve advance assignment for other arriving flights.
+        foreach (var flight in flights.Where(f =>
+            f.Type == FlightType.Arrival &&
+            (f.Status == FlightStatus.Scheduled ||
+             f.Status == FlightStatus.Approaching)))
         {
             _processor.Process(flight);
         }
