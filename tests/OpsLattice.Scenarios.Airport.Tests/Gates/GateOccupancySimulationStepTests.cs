@@ -6,209 +6,282 @@ namespace OpsLattice.Scenarios.Airport.Tests.Gates;
 
 public sealed class GateOccupancySimulationStepTests
 {
-    [Fact]
-    public void Execute_WhenFlightIsReady_ShouldOccupyAssignedGate()
+    private static readonly DateTimeOffset StartTime =
+        new(2026, 10, 4, 15, 20, 0, TimeSpan.Zero);
+
+    private readonly SimulationClock _clock;
+    private readonly InMemoryGateProvider _gateProvider;
+
+    public GateOccupancySimulationStepTests()
     {
-        var flight = CreateLandedFlight();
-
-        var flightProvider =
-            new TestFlightProvider([flight]);
-
-        var gateProvider =
-            new InMemoryGateProvider();
-
-        var gate = gateProvider
-            .GetGates()
-            .First();
-
-        gate.Assign(flight);
-
-        var clock = new SimulationClock(
-            flight.LandedAt!.Value.AddMinutes(10));
-
-        var processor = new GateOccupancyProcessor(
-            clock,
-            gateProvider);
-
-        var step = new GateOccupancySimulationStep(
-            flightProvider,
-            processor);
-
-        step.Execute();
-
-        Assert.Equal(
-            FlightStatus.AtGate,
-            flight.Status);
-
-        Assert.True(gate.IsOccupied);
-
-        Assert.Same(
-            flight,
-            gate.OccupyingFlight);
-
-        Assert.Equal(
-            clock.CurrentTime,
-            flight.ArrivedAtGateAt);
-    }
-
-    [Fact]
-    public void Execute_WhenMultipleFlightsAreReady_ShouldProcessAllFlights()
-    {
-        var firstFlight = CreateLandedFlight(
-            "UA123",
-            new DateTimeOffset(
-                2026, 10, 4, 14, 30, 0, TimeSpan.Zero));
-
-        var secondFlight = CreateLandedFlight(
-            "DL456",
-            new DateTimeOffset(
-                2026, 10, 4, 14, 35, 0, TimeSpan.Zero));
-
-        var flightProvider =
-            new TestFlightProvider(
-                [firstFlight, secondFlight]);
-
-        var gateProvider =
-            new InMemoryGateProvider();
-
-        var gates = gateProvider
-            .GetGates()
-            .Take(2)
-            .ToArray();
-
-        gates[0].Assign(firstFlight);
-        gates[1].Assign(secondFlight);
-
-        var clock = new SimulationClock(
-            secondFlight.LandedAt!.Value.AddMinutes(10));
-
-        var processor = new GateOccupancyProcessor(
-            clock,
-            gateProvider);
-
-        var step = new GateOccupancySimulationStep(
-            flightProvider,
-            processor);
-
-        step.Execute();
-
-        Assert.Equal(
-            FlightStatus.AtGate,
-            firstFlight.Status);
-
-        Assert.Equal(
-            FlightStatus.AtGate,
-            secondFlight.Status);
-
-        Assert.Same(
-            firstFlight,
-            gates[0].OccupyingFlight);
-
-        Assert.Same(
-            secondFlight,
-            gates[1].OccupyingFlight);
+        _clock = new SimulationClock(StartTime);
+        _gateProvider = new InMemoryGateProvider();
     }
 
     [Fact]
     public void GetNextExecutionTime_WhenFlightHasLanded_ShouldReturnTaxiCompletionTime()
     {
-        var scheduledTime = new DateTimeOffset(
-            2026, 10, 4, 15, 15, 0, TimeSpan.Zero);
+        // Arrange
+        var flight = CreateLandedArrival(
+            "DL100",
+            StartTime.AddMinutes(5));
 
-        var landedAt = new DateTimeOffset(
-            2026, 10, 4, 15, 25, 0, TimeSpan.Zero);
+        var gate = _gateProvider.GetGates().First();
+        gate.Assign(flight);
 
-        var flight = new Flight
-        {
-            FlightNumber = "DL456",
-            Airline = "Delta Air Lines",
-            Origin = "ATL",
-            Destination = "IAH",
-            ScheduledTime = scheduledTime,
-            Type = FlightType.Arrival
-        };
+        var step = CreateStep(flight);
 
-        flight.BeginApproach(scheduledTime);
-        flight.Land(landedAt);
+        // Act
+        var next = step.GetNextExecutionTime(
+            StartTime,
+            StartTime.AddMinutes(30));
 
-        var flightProvider =
-            new TestFlightProvider([flight]);
+        // Assert
+        Assert.Equal(
+            StartTime.AddMinutes(15),
+            next);
+    }
 
-        var gateProvider =
-            new InMemoryGateProvider();
+    [Fact]
+    public void GetNextExecutionTime_WhenLandedFlightHasNoGate_ShouldReturnNull()
+    {
+        // Arrange
+        var flight = CreateLandedArrival(
+            "DL100",
+            StartTime.AddMinutes(5));
 
-        var clock =
-            new SimulationClock(landedAt);
+        var step = CreateStep(flight);
 
-        var processor =
-            new GateOccupancyProcessor(
-                clock,
-                gateProvider);
+        // Act
+        var next = step.GetNextExecutionTime(
+            StartTime,
+            StartTime.AddMinutes(30));
 
-        var step =
-            new GateOccupancySimulationStep(
-                flightProvider,
-                processor);
+        // Assert
+        Assert.Null(next);
+    }
 
-        var targetTime =
-            new DateTimeOffset(
-                2026, 10, 4, 16, 0, 0, TimeSpan.Zero);
+    [Fact]
+    public void GetNextExecutionTime_WhenFlightHasNotLanded_ShouldReturnNull()
+    {
+        // Arrange
+        var flight = CreateFlight(
+            "DL100",
+            FlightType.Arrival,
+            StartTime.AddMinutes(20));
 
-        var nextExecutionTime =
-            step.GetNextExecutionTime(
-                clock.CurrentTime,
-                targetTime);
+        var gate = _gateProvider.GetGates().First();
+        gate.Assign(flight);
+
+        var step = CreateStep(flight);
+
+        // Act
+        var next = step.GetNextExecutionTime(
+            StartTime,
+            StartTime.AddMinutes(30));
+
+        // Assert
+        Assert.Null(next);
+    }
+
+    [Fact]
+    public void GetNextExecutionTime_WhenFlightIsDeparture_ShouldReturnNull()
+    {
+        // Arrange
+        var flight = CreateFlight(
+            "DL200",
+            FlightType.Departure,
+            StartTime.AddMinutes(20));
+
+        var step = CreateStep(flight);
+
+        // Act
+        var next = step.GetNextExecutionTime(
+            StartTime,
+            StartTime.AddMinutes(30));
+
+        // Assert
+        Assert.Null(next);
+    }
+
+    [Fact]
+    public void GetNextExecutionTime_WhenTaxiCompletionIsOutsideWindow_ShouldReturnNull()
+    {
+        // Arrange
+        var flight = CreateLandedArrival(
+            "DL100",
+            StartTime.AddMinutes(15));
+
+        var gate = _gateProvider.GetGates().First();
+        gate.Assign(flight);
+
+        var step = CreateStep(flight);
+
+        // Act
+        var next = step.GetNextExecutionTime(
+            StartTime,
+            StartTime.AddMinutes(20));
+
+        // Taxi completion is at StartTime + 25 minutes.
+
+        // Assert
+        Assert.Null(next);
+    }
+
+    [Fact]
+    public void GetNextExecutionTime_WhenTaxiCompletionIsAlreadyPast_ShouldReturnNull()
+    {
+        // Arrange
+        var flight = CreateLandedArrival(
+            "DL100",
+            StartTime.AddMinutes(5));
+
+        var gate = _gateProvider.GetGates().First();
+        gate.Assign(flight);
+
+        _clock.Advance(TimeSpan.FromMinutes(20));
+
+        var step = CreateStep(flight);
+
+        // Act
+        var next = step.GetNextExecutionTime(
+            _clock.CurrentTime,
+            _clock.CurrentTime.AddMinutes(30));
+
+        // Assert
+        Assert.Null(next);
+    }
+
+    [Fact]
+    public void GetNextExecutionTime_WithMultipleFlights_ShouldReturnEarliestEvent()
+    {
+        // Arrange
+        var first = CreateLandedArrival(
+            "DL100",
+            StartTime.AddMinutes(10));
+
+        var second = CreateLandedArrival(
+            "DL200",
+            StartTime.AddMinutes(5));
+
+        var gates = _gateProvider.GetGates().ToArray();
+
+        gates[0].Assign(first);
+        gates[1].Assign(second);
+
+        var step = CreateStep(first, second);
+
+        // Act
+        var next = step.GetNextExecutionTime(
+            StartTime,
+            StartTime.AddMinutes(30));
+
+        // Assert
+        Assert.Equal(
+            StartTime.AddMinutes(15),
+            next);
+    }
+
+    [Fact]
+    public void Execute_WhenTaxiCompleted_ShouldOccupyGate()
+    {
+        // Arrange
+        var flight = CreateLandedArrival(
+            "DL100",
+            StartTime.AddMinutes(5));
+
+        var gate = _gateProvider.GetGates().First();
+        gate.Assign(flight);
+
+        var step = CreateStep(flight);
+
+        _clock.Advance(TimeSpan.FromMinutes(15));
+
+        // Act
+        step.Execute();
+
+        // Assert
+        Assert.Equal(
+            FlightStatus.AtGate,
+            flight.Status);
+
+        Assert.True(gate.IsOccupied);
+        Assert.Same(flight, gate.OccupyingFlight);
 
         Assert.Equal(
-            new DateTimeOffset(
-                2026, 10, 4, 15, 35, 0, TimeSpan.Zero),
-            nextExecutionTime);
+            _clock.CurrentTime,
+            flight.ArrivedAtGateAt);
     }
 
-    private static Flight CreateLandedFlight()
+    [Fact]
+    public void Execute_WhenFlightHasNoGate_ShouldRemainLanded()
     {
-        return CreateLandedFlight(
-            "UA123",
-            new DateTimeOffset(
-                2026, 10, 4, 14, 30, 0, TimeSpan.Zero));
+        // Arrange
+        var flight = CreateLandedArrival(
+            "DL100",
+            StartTime.AddMinutes(5));
+
+        var step = CreateStep(flight);
+
+        _clock.Advance(TimeSpan.FromMinutes(15));
+
+        // Act
+        step.Execute();
+
+        // Assert
+        Assert.Equal(
+            FlightStatus.Landed,
+            flight.Status);
+
+        Assert.All(
+            _gateProvider.GetGates(),
+            gate => Assert.False(gate.IsOccupied));
     }
 
-    private static Flight CreateLandedFlight(
+    private GateOccupancySimulationStep CreateStep(
+        params Flight[] flights)
+    {
+        // Uses the same flight provider contract as production.
+        var flightProvider =
+            new InMemoryFlightProvider(flights);
+
+        var processor = new GateOccupancyProcessor(
+            _clock,
+            _gateProvider);
+
+        return new GateOccupancySimulationStep(
+            flightProvider,
+            processor);
+    }
+
+    private static Flight CreateFlight(
         string flightNumber,
+        FlightType type,
         DateTimeOffset scheduledTime)
     {
-        var flight = new Flight
+        return new Flight
         {
             FlightNumber = flightNumber,
-            Airline = "Test Airline",
+            Airline = "Delta",
             Origin = "ORD",
-            Destination = "IAH",
-            ScheduledTime = scheduledTime,
-            Type = FlightType.Arrival
+            Destination = "ATL",
+            Type = type,
+            ScheduledTime = scheduledTime
         };
-
-        flight.BeginApproach(
-            flight.ScheduledTime);
-
-        flight.Land(
-            flight.ScheduledTime.AddMinutes(10));
-
-        return flight;
     }
 
-    private sealed class TestFlightProvider : IFlightProvider
+    private static Flight CreateLandedArrival(
+        string flightNumber,
+        DateTimeOffset landedAt)
     {
-        private readonly IReadOnlyCollection<Flight> _flights;
+        var flight = CreateFlight(
+            flightNumber,
+            FlightType.Arrival,
+            landedAt.AddMinutes(-10));
 
-        public TestFlightProvider(
-            IReadOnlyCollection<Flight> flights)
-        {
-            _flights = flights;
-        }
+        flight.BeginApproach(landedAt.AddMinutes(-10));
+        flight.Land(landedAt);
 
-        public IReadOnlyCollection<Flight> GetFlights()
-        {
-            return _flights;
-        }
+        return flight;
     }
 }

@@ -21,9 +21,14 @@ public sealed class GateAssignmentProcessor
 
     public void Process(Flight flight)
     {
-        // For now, gate planning applies only to flights that
-        // have not yet started their arrival lifecycle.
-        if (flight.Status != FlightStatus.Scheduled)
+        if (flight.Type != FlightType.Arrival)
+        {
+            return;
+        }
+
+        if (flight.Status != FlightStatus.Scheduled &&
+            flight.Status != FlightStatus.Approaching &&
+            flight.Status != FlightStatus.Landed)
         {
             return;
         }
@@ -31,38 +36,50 @@ public sealed class GateAssignmentProcessor
         var timeUntilArrival =
             flight.ScheduledTime - _clock.CurrentTime;
 
-        // Do not assign a gate until the flight enters
-        // the 60-minute gate-planning horizon.
+        // Do not assign a gate before the flight
+        // enters the 60-minute planning horizon.
         if (timeUntilArrival > AssignmentHorizon)
         {
             return;
         }
 
-        // Find the first gate that has not already
-        // been assigned to another flight.
-        var gate = _gateProvider
-            .GetGates()
-            .FirstOrDefault(gate => !gate.IsAssigned);
+        var gates = _gateProvider.GetGates();
 
-        // No gate is currently available for assignment.
-        // We'll handle conflicts explicitly later.
+        // A flight must not be assigned to more
+        // than one gate.
+        if (gates.Any(gate =>
+            gate.AssignedFlight == flight))
+        {
+            return;
+        }
+
+        // Find the first gate that is not assigned
+        // to another flight.
+        var gate = gates.FirstOrDefault(
+            gate => !gate.IsAssigned);
+
+        // No available gate.
+        // Retry behavior will be implemented separately.
         if (gate is null)
         {
             return;
         }
 
+        // Assign the arrival flight to the gate.
         gate.Assign(flight);
     }
 
     public DateTimeOffset? GetNextExecutionTime(
         Flight flight)
     {
-        if (flight.Status != FlightStatus.Scheduled)
+        // Only scheduled arrivals generate
+        // gate-assignment scheduling events.
+        if (flight.Type != FlightType.Arrival ||
+            flight.Status != FlightStatus.Scheduled)
         {
             return null;
         }
 
-        return flight.ScheduledTime -
-               AssignmentHorizon;
+        return flight.ScheduledTime - AssignmentHorizon;
     }
 }
