@@ -2,15 +2,27 @@
 
 public sealed class InMemoryGateProvider : IGateProvider
 {
-    private readonly List<Gate> _gates =
-    [
-        new Gate("B10"),
-        new Gate("B11"),
-        new Gate("B12")
-    ];
+    private readonly IReadOnlyCollection<Gate> _gates;
+
+    public InMemoryGateProvider()
+        : this(
+        [
+            new Gate("B10"),
+            new Gate("B11"),
+            new Gate("B12")
+        ])
+    {
+    }
+
+    public InMemoryGateProvider(IEnumerable<Gate> gates)
+    {
+        ArgumentNullException.ThrowIfNull(gates);
+
+        _gates = Array.AsReadOnly(gates.ToArray());
+    }
 
     public IReadOnlyCollection<Gate> GetGates()
     {
-        return _gates.AsReadOnly();
+        return _gates;
     }
 }
