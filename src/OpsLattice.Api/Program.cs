@@ -82,13 +82,17 @@ builder.Services.AddSingleton<SimulationRunner>(provider =>
     var gateDepartureStep =
         provider.GetRequiredService<GateDepartureSimulationStep>();
 
+    var flightDepartureStep =
+        provider.GetRequiredService<FlightDepartureSimulationStep>();
+
     return new SimulationRunner(
         clock,
         [
             gateAssignmentStep,
             arrivalStep,
             gateOccupancyStep,
-            gateDepartureStep
+            gateDepartureStep,
+            flightDepartureStep
         ]);
 });
 

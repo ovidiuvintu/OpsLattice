@@ -19,16 +19,30 @@ public sealed class GateOccupancyProcessor
         _gateProvider = gateProvider;
     }
 
-    public DateTimeOffset? GetNextExecutionTime(
-        Flight flight)
+    public DateTimeOffset? GetNextExecutionTime(Flight flight)
     {
-        if (flight.Status != FlightStatus.Landed ||
+        if (flight.Type != FlightType.Arrival ||
+            flight.Status != FlightStatus.Landed ||
             !flight.LandedAt.HasValue)
         {
             return null;
         }
 
-        return flight.LandedAt.Value + TaxiDuration;
+        var gate = _gateProvider
+            .GetGates()
+            .FirstOrDefault(g => g.AssignedFlight == flight);
+
+        if (gate is null || gate.IsOccupied)
+        {
+            return null;
+        }
+
+        var taxiCompletedAt =
+            flight.LandedAt.Value + TaxiDuration;
+
+        return taxiCompletedAt > _clock.CurrentTime
+            ? taxiCompletedAt
+            : null;
     }
 
     public void Process(Flight flight)

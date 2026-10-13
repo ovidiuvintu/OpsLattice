@@ -61,6 +61,12 @@ public sealed class GateDepartureProcessor
             return;
         }
 
+        if (gate.AssignedFlight != flight ||  gate.OccupyingFlight != flight)
+        {
+            throw new InvalidOperationException(
+                $"Inconsistent gate state for flight {flight.FlightNumber}.");
+        }
+
         flight.Depart();
         gate.Release(flight);
     }
