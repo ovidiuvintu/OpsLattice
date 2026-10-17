@@ -1,14 +1,13 @@
-﻿using OpsLattice.Scenarios.Airport.Gates;
-using OpsLattice.Simulator.Time;
+﻿using OpsLattice.Simulator.Time;
 
 namespace OpsLattice.Scenarios.Airport.Flights;
 
 public sealed class FlightDepartureProcessor
 {
-    private static readonly TimeSpan BoardingLeadTime =
+    private static readonly TimeSpan _boardingLeadTime =
         TimeSpan.FromMinutes(40);
 
-    private static readonly TimeSpan BoardingCompletionLeadTime =
+    private static readonly TimeSpan _boardingCompletionLeadTime =
         TimeSpan.FromMinutes(10);
 
     private readonly ISimulationClock _clock;
@@ -28,10 +27,10 @@ public sealed class FlightDepartureProcessor
         return flight.Status switch
         {
             FlightStatus.Scheduled =>
-                flight.ScheduledTime - BoardingLeadTime,
+                flight.ScheduledTime - _boardingLeadTime,
 
             FlightStatus.Boarding =>
-                flight.ScheduledTime - BoardingCompletionLeadTime,
+                flight.ScheduledTime - _boardingCompletionLeadTime,
 
             FlightStatus.ReadyForDeparture =>
                 flight.ScheduledTime,
@@ -51,14 +50,14 @@ public sealed class FlightDepartureProcessor
         {
             case FlightStatus.Scheduled
                 when _clock.CurrentTime >=
-                     flight.ScheduledTime - BoardingLeadTime:
+                     flight.ScheduledTime - _boardingLeadTime:
 
                 flight.BeginBoarding();
                 break;
 
             case FlightStatus.Boarding
                 when _clock.CurrentTime >=
-                     flight.ScheduledTime - BoardingCompletionLeadTime:
+                     flight.ScheduledTime - _boardingCompletionLeadTime:
 
                 flight.CompleteBoarding();
                 break;

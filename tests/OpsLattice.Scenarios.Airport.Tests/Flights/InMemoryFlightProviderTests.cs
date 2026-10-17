@@ -1,4 +1,5 @@
-﻿using OpsLattice.Scenarios.Airport.Flights;
+using OpsLattice.Scenarios.Airport.Flights;
+using Xunit;
 
 namespace OpsLattice.Scenarios.Airport.Tests.Flights;
 

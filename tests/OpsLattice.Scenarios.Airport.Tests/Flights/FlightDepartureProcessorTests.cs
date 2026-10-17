@@ -1,11 +1,12 @@
-﻿using OpsLattice.Scenarios.Airport.Flights;
+using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Simulator.Time;
+using Xunit;
 
 namespace OpsLattice.Scenarios.Airport.Tests.Flights;
 
 public sealed class FlightDepartureProcessorTests
 {
-    private static readonly DateTimeOffset DepartureTime =
+    private static readonly DateTimeOffset _departureTime =
         new(2026, 10, 6, 15, 0, 0, TimeSpan.Zero);
 
     private static Flight CreateDeparture()
@@ -16,7 +17,7 @@ public sealed class FlightDepartureProcessorTests
             Airline = "Delta Air Lines",
             Origin = "ATL",
             Destination = "JFK",
-            ScheduledTime = DepartureTime,
+            ScheduledTime = _departureTime,
             Type = FlightType.Departure
         };
     }
@@ -25,7 +26,7 @@ public sealed class FlightDepartureProcessorTests
     public void ScheduledFlight_ShouldBeginBoarding40MinutesBeforeDeparture()
     {
         var clock = new SimulationClock(
-            DepartureTime.AddMinutes(-40));
+            _departureTime.AddMinutes(-40));
 
         var processor = new FlightDepartureProcessor(clock);
         var flight = CreateDeparture();
@@ -39,7 +40,7 @@ public sealed class FlightDepartureProcessorTests
     public void BoardingFlight_ShouldBecomeReady10MinutesBeforeDeparture()
     {
         var clock = new SimulationClock(
-            DepartureTime.AddMinutes(-40));
+            _departureTime.AddMinutes(-40));
 
         var processor = new FlightDepartureProcessor(clock);
         var flight = CreateDeparture();
@@ -57,7 +58,7 @@ public sealed class FlightDepartureProcessorTests
     public void ReadyFlight_ShouldDepartAtScheduledTime()
     {
         var clock = new SimulationClock(
-            DepartureTime.AddMinutes(-40));
+            _departureTime.AddMinutes(-40));
 
         var processor = new FlightDepartureProcessor(clock);
         var flight = CreateDeparture();
@@ -79,13 +80,13 @@ public sealed class FlightDepartureProcessorTests
     public void ScheduledFlight_ShouldReturnBoardingTime()
     {
         var clock = new SimulationClock(
-            DepartureTime.AddHours(-1));
+            _departureTime.AddHours(-1));
 
         var processor = new FlightDepartureProcessor(clock);
         var flight = CreateDeparture();
 
         Assert.Equal(
-            DepartureTime.AddMinutes(-40),
+            _departureTime.AddMinutes(-40),
             processor.GetNextExecutionTime(flight));
     }
 
@@ -93,7 +94,7 @@ public sealed class FlightDepartureProcessorTests
     public void ArrivalFlight_ShouldNotBeProcessed()
     {
         var clock = new SimulationClock(
-            DepartureTime);
+            _departureTime);
 
         var processor = new FlightDepartureProcessor(clock);
 
@@ -103,7 +104,7 @@ public sealed class FlightDepartureProcessorTests
             Airline = "Delta Air Lines",
             Origin = "JFK",
             Destination = "ATL",
-            ScheduledTime = DepartureTime,
+            ScheduledTime = _departureTime,
             Type = FlightType.Arrival
         };
 
