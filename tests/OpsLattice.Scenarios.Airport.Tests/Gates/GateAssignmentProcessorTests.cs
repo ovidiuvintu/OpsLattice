@@ -1,12 +1,13 @@
-﻿using OpsLattice.Scenarios.Airport.Flights;
+using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Gates;
 using OpsLattice.Simulator.Time;
+using Xunit;
 
 namespace OpsLattice.Scenarios.Airport.Tests;
 
 public sealed class GateAssignmentProcessorTests
 {
-    private static readonly DateTimeOffset StartTime =
+    private static readonly DateTimeOffset _startTime =
         new(2026, 10, 6, 12, 0, 0, TimeSpan.Zero);
 
     private readonly SimulationClock _clock;
@@ -15,7 +16,7 @@ public sealed class GateAssignmentProcessorTests
 
     public GateAssignmentProcessorTests()
     {
-        _clock = new SimulationClock(StartTime);
+        _clock = new SimulationClock(_startTime);
 
         _gateProvider = new InMemoryGateProvider();
 
@@ -30,7 +31,7 @@ public sealed class GateAssignmentProcessorTests
         // Arrange
         var flight = CreateFlight(
             FlightType.Arrival,
-            StartTime.AddMinutes(30));
+            _startTime.AddMinutes(30));
 
         // Act
         _processor.Process(flight);
@@ -47,7 +48,7 @@ public sealed class GateAssignmentProcessorTests
         // Arrange
         var flight = CreateFlight(
             FlightType.Arrival,
-            StartTime.AddMinutes(90));
+            _startTime.AddMinutes(90));
 
         // Act
         _processor.Process(flight);
@@ -64,7 +65,7 @@ public sealed class GateAssignmentProcessorTests
         // Arrange
         var flight = CreateFlight(
             FlightType.Arrival,
-            StartTime.AddMinutes(60));
+            _startTime.AddMinutes(60));
 
         // Act
         _processor.Process(flight);
@@ -81,7 +82,7 @@ public sealed class GateAssignmentProcessorTests
         // Arrange
         var flight = CreateFlight(
             FlightType.Departure,
-            StartTime.AddMinutes(30));
+            _startTime.AddMinutes(30));
 
         // Act
         _processor.Process(flight);
@@ -98,9 +99,9 @@ public sealed class GateAssignmentProcessorTests
         // Arrange
         var flight = CreateFlight(
             FlightType.Arrival,
-            StartTime.AddMinutes(30));
+            _startTime.AddMinutes(30));
 
-        flight.BeginApproach(StartTime);
+        flight.BeginApproach(_startTime);
 
         // Act
         _processor.Process(flight);
@@ -121,7 +122,7 @@ public sealed class GateAssignmentProcessorTests
         {
             var existingFlight = CreateFlight(
                 FlightType.Arrival,
-                StartTime.AddMinutes(20),
+                _startTime.AddMinutes(20),
                 $"DL{i + 100}");
 
             gates[i].Assign(existingFlight);
@@ -129,7 +130,7 @@ public sealed class GateAssignmentProcessorTests
 
         var newFlight = CreateFlight(
             FlightType.Arrival,
-            StartTime.AddMinutes(30),
+            _startTime.AddMinutes(30),
             "DL999");
 
         // Act
@@ -151,7 +152,7 @@ public sealed class GateAssignmentProcessorTests
         // Arrange
         var flight = CreateFlight(
             FlightType.Arrival,
-            StartTime.AddMinutes(90));
+            _startTime.AddMinutes(90));
 
         // Act
         var nextExecutionTime =
@@ -159,7 +160,7 @@ public sealed class GateAssignmentProcessorTests
 
         // Assert
         Assert.Equal(
-            StartTime.AddMinutes(30),
+            _startTime.AddMinutes(30),
             nextExecutionTime);
     }
 
@@ -169,7 +170,7 @@ public sealed class GateAssignmentProcessorTests
         // Arrange
         var flight = CreateFlight(
             FlightType.Departure,
-            StartTime.AddMinutes(30));
+            _startTime.AddMinutes(30));
 
         // Act
         var nextExecutionTime =
@@ -185,9 +186,9 @@ public sealed class GateAssignmentProcessorTests
         // Arrange
         var flight = CreateFlight(
             FlightType.Arrival,
-            StartTime.AddMinutes(30));
+            _startTime.AddMinutes(30));
 
-        flight.BeginApproach(StartTime);
+        flight.BeginApproach(_startTime);
 
         // Act
         var nextExecutionTime =

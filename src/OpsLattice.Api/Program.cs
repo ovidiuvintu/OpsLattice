@@ -1,10 +1,15 @@
 using System.Text.Json.Serialization;
+using OpsLattice.Agents.Abstractions;
+using OpsLattice.Agents.Agents;
+using OpsLattice.Agents.Infrastructure;
+using OpsLattice.Api.Infrastructure.Scheduling;
+using OpsLattice.Api.Mcp;
 using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Gates;
+using OpsLattice.Scenarios.Airport.Scheduling;
 using OpsLattice.Simulator.Simulation;
 using OpsLattice.Simulator.Time;
-using OpsLattice.Api.Infrastructure.Scheduling;
-using OpsLattice.Scenarios.Airport.Scheduling;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,9 +34,16 @@ builder.Services.AddSingleton<IFlightProvider>(provider =>
     var flights = loader.Load(scheduleDate);
 
     return new InMemoryFlightProvider(flights);
-}); 
+});
 
 builder.Services.AddSingleton<IGateProvider, InMemoryGateProvider>();
+
+builder.Services.AddSingleton<FlightQueryService>();
+
+builder.Services.AddSingleton<IAgentToolGateway>(
+    _ => new McpAgentToolGateway(
+        new Uri("http://localhost:5160/mcp")));
+
 
 // Simulation clock
 var simulationStartTime =
@@ -109,6 +121,20 @@ builder.Services.AddSingleton<IFlightScheduleLoader>(
             "Data",
             "OpsLattice_ATL_Daily_Flight_Schedule_2150.xlsx")));
 
+builder.Services.AddHttpClient<ILlmClient, OllamaLlmClient>(
+    client =>
+    {
+        client.BaseAddress =
+            new Uri("http://localhost:11434");
+        client.Timeout = TimeSpan.FromMinutes(2);
+    });
+
+builder.Services.AddScoped<AirportOperationsAgent>();
+
+builder.Services.AddMcpServer()
+    .WithHttpTransport()
+    .WithTools<FlightTools>();
+
 // Web client
 builder.Services.AddCors(options =>
 {
@@ -122,6 +148,12 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+}
 
 using (var scope = app.Services.CreateScope())
 {
@@ -143,8 +175,51 @@ using (var scope = app.Services.CreateScope())
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapGet("/api/debug/mcp-tools",
+        async (
+            IAgentToolGateway gateway,
+            CancellationToken cancellationToken) =>
+        {
+            var tools = await gateway.ListToolsAsync(
+                cancellationToken);
+
+            return Results.Ok(tools);
+    });
+
+    app.MapGet("/api/debug/mcp-flights",
+        async (
+            IAgentToolGateway gateway,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await gateway.CallToolAsync(
+                "get_flights",
+                new Dictionary<string, object?>(),
+                cancellationToken);
+
+            return Results.Text(result, "application/json");
+        });
 }
+
+app.MapMcp("/mcp");
+
+app.MapPost("/api/assistant/query",
+    async (
+        AssistantQueryRequest request,
+        AirportOperationsAgent agent,
+        CancellationToken cancellationToken) =>
+    {
+        if (string.IsNullOrWhiteSpace(request.Question))
+        {
+            return Results.BadRequest(
+                "Question is required.");
+        }
+
+        var answer = await agent.RunAsync(
+            request.Question,
+            cancellationToken);
+
+        return Results.Ok(new { answer });
+    });
 
 app.UseHttpsRedirection();
 
@@ -153,3 +228,5 @@ app.UseCors("WebClient");
 app.MapControllers();
 
 app.Run();
+
+public sealed record AssistantQueryRequest(string Question);

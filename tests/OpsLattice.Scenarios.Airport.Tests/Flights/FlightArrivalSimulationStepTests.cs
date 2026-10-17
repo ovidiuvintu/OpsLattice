@@ -1,6 +1,8 @@
-﻿using OpsLattice.Scenarios.Airport.Flights;
+using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Simulator.Simulation;
 using OpsLattice.Simulator.Time;
+
+using Xunit;
 
 namespace OpsLattice.Scenarios.Airport.Tests.Flights;
 

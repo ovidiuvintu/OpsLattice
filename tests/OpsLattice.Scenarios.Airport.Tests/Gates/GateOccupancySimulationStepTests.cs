@@ -1,12 +1,13 @@
-﻿using OpsLattice.Scenarios.Airport.Flights;
+using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Gates;
 using OpsLattice.Simulator.Time;
+using Xunit;
 
 namespace OpsLattice.Scenarios.Airport.Tests.Gates;
 
 public sealed class GateOccupancySimulationStepTests
 {
-    private static readonly DateTimeOffset StartTime =
+    private static readonly DateTimeOffset _startTime =
         new(2026, 10, 4, 15, 20, 0, TimeSpan.Zero);
 
     private readonly SimulationClock _clock;
@@ -14,7 +15,7 @@ public sealed class GateOccupancySimulationStepTests
 
     public GateOccupancySimulationStepTests()
     {
-        _clock = new SimulationClock(StartTime);
+        _clock = new SimulationClock(_startTime);
         _gateProvider = new InMemoryGateProvider();
     }
 
@@ -24,7 +25,7 @@ public sealed class GateOccupancySimulationStepTests
         // Arrange
         var flight = CreateLandedArrival(
             "DL100",
-            StartTime.AddMinutes(5));
+            _startTime.AddMinutes(5));
 
         var gate = _gateProvider.GetGates().First();
         gate.Assign(flight);
@@ -33,12 +34,12 @@ public sealed class GateOccupancySimulationStepTests
 
         // Act
         var next = step.GetNextExecutionTime(
-            StartTime,
-            StartTime.AddMinutes(30));
+            _startTime,
+            _startTime.AddMinutes(30));
 
         // Assert
         Assert.Equal(
-            StartTime.AddMinutes(15),
+            _startTime.AddMinutes(15),
             next);
     }
 
@@ -48,14 +49,14 @@ public sealed class GateOccupancySimulationStepTests
         // Arrange
         var flight = CreateLandedArrival(
             "DL100",
-            StartTime.AddMinutes(5));
+            _startTime.AddMinutes(5));
 
         var step = CreateStep(flight);
 
         // Act
         var next = step.GetNextExecutionTime(
-            StartTime,
-            StartTime.AddMinutes(30));
+            _startTime,
+            _startTime.AddMinutes(30));
 
         // Assert
         Assert.Null(next);
@@ -68,7 +69,7 @@ public sealed class GateOccupancySimulationStepTests
         var flight = CreateFlight(
             "DL100",
             FlightType.Arrival,
-            StartTime.AddMinutes(20));
+            _startTime.AddMinutes(20));
 
         var gate = _gateProvider.GetGates().First();
         gate.Assign(flight);
@@ -77,8 +78,8 @@ public sealed class GateOccupancySimulationStepTests
 
         // Act
         var next = step.GetNextExecutionTime(
-            StartTime,
-            StartTime.AddMinutes(30));
+            _startTime,
+            _startTime.AddMinutes(30));
 
         // Assert
         Assert.Null(next);
@@ -91,14 +92,14 @@ public sealed class GateOccupancySimulationStepTests
         var flight = CreateFlight(
             "DL200",
             FlightType.Departure,
-            StartTime.AddMinutes(20));
+            _startTime.AddMinutes(20));
 
         var step = CreateStep(flight);
 
         // Act
         var next = step.GetNextExecutionTime(
-            StartTime,
-            StartTime.AddMinutes(30));
+            _startTime,
+            _startTime.AddMinutes(30));
 
         // Assert
         Assert.Null(next);
@@ -110,7 +111,7 @@ public sealed class GateOccupancySimulationStepTests
         // Arrange
         var flight = CreateLandedArrival(
             "DL100",
-            StartTime.AddMinutes(15));
+            _startTime.AddMinutes(15));
 
         var gate = _gateProvider.GetGates().First();
         gate.Assign(flight);
@@ -119,8 +120,8 @@ public sealed class GateOccupancySimulationStepTests
 
         // Act
         var next = step.GetNextExecutionTime(
-            StartTime,
-            StartTime.AddMinutes(20));
+            _startTime,
+            _startTime.AddMinutes(20));
 
         // Taxi completion is at StartTime + 25 minutes.
 
@@ -134,7 +135,7 @@ public sealed class GateOccupancySimulationStepTests
         // Arrange
         var flight = CreateLandedArrival(
             "DL100",
-            StartTime.AddMinutes(5));
+            _startTime.AddMinutes(5));
 
         var gate = _gateProvider.GetGates().First();
         gate.Assign(flight);
@@ -158,11 +159,11 @@ public sealed class GateOccupancySimulationStepTests
         // Arrange
         var first = CreateLandedArrival(
             "DL100",
-            StartTime.AddMinutes(10));
+            _startTime.AddMinutes(10));
 
         var second = CreateLandedArrival(
             "DL200",
-            StartTime.AddMinutes(5));
+            _startTime.AddMinutes(5));
 
         var gates = _gateProvider.GetGates().ToArray();
 
@@ -173,12 +174,12 @@ public sealed class GateOccupancySimulationStepTests
 
         // Act
         var next = step.GetNextExecutionTime(
-            StartTime,
-            StartTime.AddMinutes(30));
+            _startTime,
+            _startTime.AddMinutes(30));
 
         // Assert
         Assert.Equal(
-            StartTime.AddMinutes(15),
+            _startTime.AddMinutes(15),
             next);
     }
 
@@ -188,7 +189,7 @@ public sealed class GateOccupancySimulationStepTests
         // Arrange
         var flight = CreateLandedArrival(
             "DL100",
-            StartTime.AddMinutes(5));
+            _startTime.AddMinutes(5));
 
         var gate = _gateProvider.GetGates().First();
         gate.Assign(flight);
@@ -219,7 +220,7 @@ public sealed class GateOccupancySimulationStepTests
         // Arrange
         var flight = CreateLandedArrival(
             "DL100",
-            StartTime.AddMinutes(5));
+            _startTime.AddMinutes(5));
 
         var step = CreateStep(flight);
 

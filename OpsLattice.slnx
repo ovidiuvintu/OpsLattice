@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/OpsLattice.Agents/OpsLattice.Agents.csproj" Id="fb1dc4d7-7f42-4b97-aeed-36f873d1fadc" />
     <Project Path="src/OpsLattice.Api/OpsLattice.Api.csproj" Id="87057847-ecd3-40e2-a4a1-38cbc8763c11" />
     <Project Path="src/OpsLattice.Core/OpsLattice.Core.csproj" Id="fbe8298f-d6b6-4ef3-a2f4-b790ecc233e0" />
     <Project Path="src/OpsLattice.Scenarios.Airport/OpsLattice.Scenarios.Airport.csproj" Id="4c085779-2015-461f-9429-b0f8bfeea7ae" />
@@ -10,6 +11,7 @@
     </Project>
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/OppsLattice.Agents.Tests/OpsLattice.Agents.Tests.csproj" Id="b3b5e5b8-64c9-4050-afc4-aa62193fe5a3" />
     <Project Path="tests/OpsLattice.Architecture.Tests/OpsLattice.Architecture.Tests.csproj" Id="489cbb7e-d566-4258-96a8-acfc16df4d4e" />
     <Project Path="tests/OpsLattice.Core.Tests/OpsLattice.Core.Tests.csproj" Id="b03c80eb-57f3-497d-9438-ef48f8dbff12" />
     <Project Path="tests/OpsLattice.Scenarios.Airport.Tests/OpsLattice.Scenarios.Airport.Tests.csproj" Id="015e9f60-7821-46db-8457-09d5aac52793" />

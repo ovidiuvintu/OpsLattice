@@ -1,4 +1,5 @@
-﻿using OpsLattice.Simulator.Time;
+using OpsLattice.Simulator.Time;
+using Xunit;
 
 namespace OpsLattice.Simulator.Tests.Time;
 
