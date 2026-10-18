@@ -4,6 +4,13 @@ interface FlightTableProps {
   flights: Flight[];
 }
 
+
+
+const cellStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  borderBottom: "1px solid #e5e5e5",
+};
+
 export function FlightTable({
   flights,
 }: FlightTableProps) {
@@ -11,8 +18,14 @@ export function FlightTable({
     <section className="flights-section">
       <h2>Flights</h2>
 
-      <table>
-        <thead>
+      <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: 13,
+            textAlign: "left",
+      }}
+    >        <thead>
           <tr>
             <th>Flight</th>
             <th>Airline</th>
@@ -26,21 +39,21 @@ export function FlightTable({
         <tbody>
           {flights.map((flight) => (
             <tr key={flight.flightNumber}>
-              <td>{flight.flightNumber}</td>
+              <td style={cellStyle}>{flight.flightNumber}</td>
 
-              <td>{flight.airline}</td>
+              <td style={cellStyle}>{flight.airline}</td>
 
-              <td>
+              <td style={cellStyle}>
                 {flight.origin} → {flight.destination}
               </td>
 
-              <td>
+              <td style={cellStyle}>
                 {formatTime(flight.scheduledTime)}
               </td>
 
-              <td>{flight.status}</td>
+              <td style={cellStyle}>{flight.status}</td>
 
-              <td>{flight.gate ?? "—"}</td>
+              <td style={cellStyle}>{flight.gate ?? "—"}</td>
             </tr>
           ))}
         </tbody>

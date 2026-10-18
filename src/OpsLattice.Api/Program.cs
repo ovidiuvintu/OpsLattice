@@ -2,13 +2,12 @@
 using System.Text.Json.Serialization;
 using OpsLattice.Agents.Abstractions;
 using OpsLattice.Api.Extensions;
-using OpsLattice.Scenarios.Airport.Flights;
-using OpsLattice.Scenarios.Airport.Scheduling;
 using OpsLattice.Scenarios.Airport.Setup;
 using OpsLattice.Scenarios.Airport.Simulation;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
 
 // --------------------------------------------------
 // API
@@ -30,7 +29,7 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddAirportSimulation(builder.Environment);
 
-builder.Services.AddOpsLatticeAgents();
+builder.Services.AddOpsLatticeAgents(builder.Configuration);
 
 // --------------------------------------------------
 // MCP server
@@ -123,34 +122,13 @@ if (app.Environment.IsDevelopment())
 }
 
 // --------------------------------------------------
-// Startup diagnostics
-// --------------------------------------------------
-
-using (var scope = app.Services.CreateScope())
-{
-    var loader = scope.ServiceProvider
-        .GetRequiredService<IFlightScheduleLoader>();
-
-    var flights = loader.Load(
-        new DateOnly(2026, 10, 6));
-
-    Console.WriteLine(
-        $"Loaded {flights.Count} flights.");
-
-    Console.WriteLine(
-        $"Arrivals: {flights.Count(
-            f => f.Type == FlightType.Arrival)}");
-
-    Console.WriteLine(
-        $"Departures: {flights.Count(
-            f => f.Type == FlightType.Departure)}");
-}
-
-// --------------------------------------------------
 // Middleware
 // --------------------------------------------------
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsProduction())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors("WebClient");
 
