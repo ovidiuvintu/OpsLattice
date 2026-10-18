@@ -1,61 +1,58 @@
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 
-interface ToolExecution {
-  toolName: string;
-  arguments: Record<string, unknown>;
-  result: string;
-  durationMs: number;
-}
+type AgentName = "airport-operations" | "gate";
 
-interface LlmExecution {
+interface AgentLlmExecution {
   iteration: number;
   durationMs: number;
   requestedTools: boolean;
   requestedToolNames: string[];
 }
 
-interface AssistantResponse {
+interface AgentToolExecution {
+  toolName: string;
+  arguments: Record<string, unknown>;
+  result: string;
+  durationMs: number;
+}
+
+interface AgentExecutionResult {
   executionId: string;
   answer: string;
   totalDurationMs: number;
-  llmExecutions: LlmExecution[];
-  toolExecutions: ToolExecution[];
+  llmExecutions: AgentLlmExecution[];
+  toolExecutions: AgentToolExecution[];
 }
 
-const API_BASE_URL = "http://localhost:5160";
-
-function formatDuration(milliseconds: number): string {
-  if (milliseconds >= 1000) {
-    return `${(milliseconds / 1000).toFixed(2)} s`;
-  }
-
-  return `${milliseconds} ms`;
-}
+const agents: { value: AgentName; label: string }[] = [
+  { value: "airport-operations", label: "Airport Operations" },
+  { value: "gate", label: "Gate Operations" },
+];
 
 export default function AirportAssistant() {
-  const [question, setQuestion] = useState(
-    "How many flights are currently scheduled?"
-  );
+  const [agentName, setAgentName] =
+    useState<AgentName>("airport-operations");
 
-  const [response, setResponse] =
-    useState<AssistantResponse | null>(null);
+  const [question, setQuestion] = useState("");
+  const [result, setResult] =
+    useState<AgentExecutionResult | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!question.trim() || loading) return;
 
     setLoading(true);
     setError(null);
-    setResponse(null);
+    setResult(null);
 
     try {
-      const httpResponse = await fetch(
-        `${API_BASE_URL}/api/assistant/query`,
+      const response = await fetch(
+        "http://localhost:5160/api/assistant/query",
         {
           method: "POST",
           headers: {
@@ -63,19 +60,17 @@ export default function AirportAssistant() {
           },
           body: JSON.stringify({
             question: question.trim(),
+            agentName,
           }),
         }
       );
 
-      if (!httpResponse.ok) {
-        throw new Error(
-          `Assistant request failed: HTTP ${httpResponse.status}`
-        );
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
       }
 
-      const data: AssistantResponse = await httpResponse.json();
-
-      setResponse(data);
+      const data: AgentExecutionResult = await response.json();
+      setResult(data);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unexpected error"
@@ -86,156 +81,125 @@ export default function AirportAssistant() {
   }
 
   return (
-    <section
-      style={{
-        padding: 20,
-        border: "1px solid #ccc",
-        borderRadius: 8,
-      }}
-    >
-      <h2>AI Operations Assistant</h2>
+    <div style={{ maxWidth: 800, padding: 24 }}>
+      <h2>OpsLattice AI Assistant</h2>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ marginBottom: 16 }}>
+          <label htmlFor="agent">Agent</label>
+
+          <select
+            id="agent"
+            value={agentName}
+            onChange={(event) => {
+              setAgentName(event.target.value as AgentName);
+              setResult(null);
+              setError(null);
+            }}
+            disabled={loading}
+            style={{
+              display: "block",
+              width: "100%",
+              padding: 10,
+              marginTop: 6,
+            }}
+          >
+            {agents.map((agent) => (
+              <option key={agent.value} value={agent.value}>
+                {agent.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label htmlFor="question">Question</label>
+
           <input
+            id="question"
             type="text"
             value={question}
-            onChange={(e) => setQuestion(e.target.value)}
+            onChange={(event) => setQuestion(event.target.value)}
             placeholder="Ask about airport operations..."
             disabled={loading}
             style={{
-              flex: 1,
+              display: "block",
+              width: "100%",
               padding: 10,
+              marginTop: 6,
             }}
           />
-
-          <button
-            type="submit"
-            disabled={loading || !question.trim()}
-          >
-            {loading ? "Thinking..." : "Ask"}
-          </button>
         </div>
+
+        <button type="submit" disabled={loading || !question.trim()}>
+          {loading ? "Running..." : "Ask Agent"}
+        </button>
       </form>
 
       {error && (
-        <p role="alert" style={{ color: "crimson" }}>
-          {error}
-        </p>
+        <p style={{ color: "red", marginTop: 16 }}>{error}</p>
       )}
 
-      {response && (
-        <>
-          {/* Final Answer */}
-          <div style={{ marginTop: 24 }}>
-            <h3>Answer</h3>
+      {result && (
+        <div style={{ marginTop: 24 }}>
+          <h3>Answer</h3>
+          <p>{result.answer}</p>
 
-            <p style={{ whiteSpace: "pre-wrap" }}>
-              {response.answer}
-            </p>
-          </div>
+          <h3>Execution Details</h3>
 
-          {/* Execution Summary */}
-          <div style={{ marginTop: 24 }}>
-            <h3>Agent Execution Trace</h3>
+          <p>
+            <strong>Agent:</strong> {agentName}
+          </p>
 
-            <p>
-              <strong>Execution ID:</strong>{" "}
-              <code>{response.executionId ?? "Not available"}</code>
-            </p>
+          <p>
+            <strong>Execution ID:</strong> {result.executionId}
+          </p>
 
-            <p>
-              <strong>Total Duration:</strong>{" "}
-              {response.totalDurationMs == null
-                ? "Not available"
-                : formatDuration(response.totalDurationMs)}
-            </p>
+          <p>
+            <strong>Total Duration:</strong>{" "}
+            {result.totalDurationMs} ms
+          </p>
 
-            {/* LLM Executions */}
-            <h4>LLM Inference</h4>
+          <h4>LLM Executions</h4>
 
-            {(response.llmExecutions ?? []).length === 0 ? (
-              <p>No LLM execution data available.</p>
-            ) : (
-              response.llmExecutions.map((execution) => (
-                <details
-                  key={execution.iteration}
-                  style={{
-                    border: "1px solid #ddd",
-                    borderRadius: 6,
-                    padding: 12,
-                    marginBottom: 10,
-                  }}
-                >
-                  <summary style={{ cursor: "pointer" }}>
-                    LLM Iteration {execution.iteration}
-                    {" — "}
-                    {formatDuration(execution.durationMs)}
-                  </summary>
+          {result.llmExecutions.map((execution) => (
+            <div key={execution.iteration}>
+              <p>
+                Iteration {execution.iteration}:{" "}
+                {execution.durationMs} ms
+              </p>
 
-                  <p>
-                    <strong>Requested Tools:</strong>{" "}
-                    {execution.requestedTools
-                      ? execution.requestedToolNames.join(", ")
-                      : "None"}
-                  </p>
-                </details>
-              ))
-            )}
+              <p>
+                Requested Tools:{" "}
+                {execution.requestedToolNames.length > 0
+                  ? execution.requestedToolNames.join(", ")
+                  : "None"}
+              </p>
+            </div>
+          ))}
 
-            {/* MCP Executions */}
-            <h4>MCP Tool Executions</h4>
+          <h4>MCP Tool Executions</h4>
 
-            {(response.toolExecutions ?? []).length === 0 ? (
-              <p>No MCP tools were executed.</p>
-            ) : (
-              response.toolExecutions.map((execution, index) => (
-                <details
-                  key={index}
-                  style={{
-                    border: "1px solid #ddd",
-                    borderRadius: 6,
-                    padding: 12,
-                    marginBottom: 10,
-                  }}
-                >
-                  <summary style={{ cursor: "pointer" }}>
-                    {execution.toolName}
-                    {" — "}
-                    {formatDuration(execution.durationMs)}
-                  </summary>
+          {result.toolExecutions.map((execution, index) => (
+            <div key={index}>
+              <p>
+                <strong>{execution.toolName}</strong> —{" "}
+                {execution.durationMs} ms
+              </p>
 
-                  <h5>Arguments</h5>
-
-                  <pre
-                    style={{
-                      whiteSpace: "pre-wrap",
-                      overflowWrap: "anywhere",
-                    }}
-                  >
-                    {execution.arguments == null
-                      ? "Not available"
-                      : JSON.stringify(execution.arguments, null, 2)}
-                  </pre>
-
-                  <h5>Tool Result</h5>
-
-                  <pre
-                    style={{
-                      whiteSpace: "pre-wrap",
-                      overflowWrap: "anywhere",
-                      maxHeight: 300,
-                      overflowY: "auto",
-                    }}
-                  >
-                    {execution.result ?? "Not available"}
-                  </pre>
-                </details>
-              ))
-            )}
-          </div>
-        </>
+              <pre
+                style={{
+                  background: "#f5f5f5",
+                  padding: 12,
+                  overflowX: "auto",
+                }}
+              >
+                {execution.result}
+              </pre>
+            </div>
+          ))}
+        </div>
       )}
-    </section>
+    </div>
   );
 }

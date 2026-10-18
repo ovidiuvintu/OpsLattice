@@ -39,6 +39,16 @@ public sealed class AgentRunner(
             .Where(tool => allowedNames.Contains(tool.Name))
             .ToArray();
 
+        logger.LogInformation(
+            "Agent {AgentName}: Available MCP tools: {Tools}",
+            agentName,
+            string.Join(", ", tools.Select(t => t.Name)));
+
+        logger.LogInformation(
+            "Agent {AgentName}: Allowed MCP tools: {Tools}",
+            agentName,
+            string.Join(", ", allowedTools.Select(t => t.Name)));
+
         var messages = new List<AgentMessage>
         {
             new("system", systemPrompt),
