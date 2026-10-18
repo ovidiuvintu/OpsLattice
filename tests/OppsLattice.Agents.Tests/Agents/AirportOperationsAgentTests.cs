@@ -1,4 +1,5 @@
 
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Agents;
@@ -10,8 +11,9 @@ namespace OppsLattice.Agents.Tests.Agents;
 public sealed class AirportOperationsAgentTests
 {
     [Fact]
-    public async Task RunAsync_WhenLlmReturnsFinalAnswer_ReturnsAnswer()
+    public async Task RunAsync_WhenLlmReturnsFinalAnswerWithoutToolCall_ThrowsException()
     {
+        // Arrange
         var llm = new Mock<ILlmClient>();
         var gateway = new Mock<IAgentToolGateway>();
 
@@ -29,13 +31,23 @@ public sealed class AirportOperationsAgentTests
 
         var agent = new AirportOperationsAgent(
             llm.Object,
-            gateway.Object);
+            gateway.Object,
+            NullLogger<AirportOperationsAgent>.Instance);
 
-        var result = await agent.RunAsync(
-            "Which flights are waiting for gates?");
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => agent.RunAsync("Which flights are waiting for gates?"));
 
-        Assert.Equal(
-            "No flights are currently waiting for gates.",
-            result);
+        // Assert
+        Assert.Contains(
+            "must execute an MCP tool",
+            exception.Message);
+
+        gateway.Verify(
+            x => x.CallToolAsync(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }
