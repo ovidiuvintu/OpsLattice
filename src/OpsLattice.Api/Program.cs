@@ -1,18 +1,16 @@
+
 using System.Text.Json.Serialization;
 using OpsLattice.Agents.Abstractions;
-using OpsLattice.Agents.Agents;
-using OpsLattice.Agents.Execution;
-using OpsLattice.Agents.Infrastructure;
-using OpsLattice.Agents.Orchestration;
-using OpsLattice.Api.Infrastructure.Scheduling;
+using OpsLattice.Api.Extensions;
 using OpsLattice.Scenarios.Airport.Flights;
-using OpsLattice.Scenarios.Airport.Gates;
 using OpsLattice.Scenarios.Airport.Scheduling;
-using OpsLattice.Simulator.Simulation;
-using OpsLattice.Simulator.Time;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// --------------------------------------------------
+// API
+// --------------------------------------------------
 
 builder.Services
     .AddControllers()
@@ -24,145 +22,27 @@ builder.Services
 
 builder.Services.AddOpenApi();
 
-// Airport data providers
-builder.Services.AddSingleton<IFlightProvider>(provider =>
-{
-    var loader = provider
-        .GetRequiredService<IFlightScheduleLoader>();
+// --------------------------------------------------
+// Application services
+// --------------------------------------------------
 
-    var scheduleDate = new DateOnly(2026, 10, 6);
+builder.Services.AddAirportSimulation(builder.Environment);
 
-    var flights = loader.Load(scheduleDate);
+builder.Services.AddOpsLatticeAgents();
 
-    return new InMemoryFlightProvider(flights);
-});
-
-builder.Services.AddSingleton<IGateProvider>(
-    _ => new InMemoryGateProvider());
-
-builder.Services.AddSingleton<FlightQueryService>();
-
-builder.Services.AddSingleton<IAgentToolGateway>(
-    _ => new McpAgentToolGateway(
-        new Uri("http://localhost:5160/mcp")));
-
-
-// Simulation clock
-var simulationStartTime =
-    new DateTimeOffset(
-        2026, 10, 6, 0, 0, 0, TimeSpan.Zero);
-
-builder.Services.AddSingleton(
-    new SimulationClock(simulationStartTime));
-
-builder.Services.AddSingleton<ISimulationClock>(
-    provider =>
-        provider.GetRequiredService<SimulationClock>());
-
-builder.Services.AddScoped<AgentRunner>();
-
-// Airport simulation processing
-builder.Services.AddSingleton<FlightArrivalProcessor>();
-builder.Services.AddSingleton<FlightArrivalSimulationStep>();
-
-builder.Services.AddSingleton<GateAssignmentProcessor>();
-builder.Services.AddSingleton<GateAssignmentSimulationStep>();
-
-builder.Services.AddSingleton<FlightArrivalProcessor>();
-builder.Services.AddSingleton<FlightArrivalSimulationStep>();
-
-builder.Services.AddSingleton<GateAssignmentProcessor>();
-builder.Services.AddSingleton<GateAssignmentSimulationStep>();
-
-builder.Services.AddSingleton<GateOccupancyProcessor>();
-builder.Services.AddSingleton<GateOccupancySimulationStep>();
-
-builder.Services.AddSingleton<GateDepartureProcessor>();
-builder.Services.AddSingleton<GateDepartureSimulationStep>();
-
-// Simulation runner
-builder.Services.AddSingleton<SimulationRunner>(provider =>
-{
-    var clock =
-        provider.GetRequiredService<SimulationClock>();
-
-    var gateAssignmentStep =
-        provider.GetRequiredService<GateAssignmentSimulationStep>();
-
-    var arrivalStep =
-        provider.GetRequiredService<FlightArrivalSimulationStep>();
-
-    var gateOccupancyStep =
-        provider.GetRequiredService<GateOccupancySimulationStep>();
-
-    var gateDepartureStep =
-        provider.GetRequiredService<GateDepartureSimulationStep>();
-
-    var flightDepartureStep =
-        provider.GetRequiredService<FlightDepartureSimulationStep>();
-
-    return new SimulationRunner(
-        clock,
-        [
-            gateAssignmentStep,
-            arrivalStep,
-            gateOccupancyStep,
-            gateDepartureStep,
-            flightDepartureStep
-        ]);
-});
-
-builder.Services.AddSingleton<GateDepartureProcessor>();
-builder.Services.AddSingleton<GateDepartureSimulationStep>();
-
-builder.Services.AddSingleton<FlightDepartureProcessor>();
-builder.Services.AddSingleton<FlightDepartureSimulationStep>();
-
-builder.Services.AddSingleton<IFlightScheduleLoader>(
-    _ => new ExcelFlightScheduleLoader(
-        Path.Combine(
-            builder.Environment.ContentRootPath,
-            "Data",
-            "OpsLattice_ATL_Daily_Flight_Schedule_2150.xlsx")));
-
-//builder.Services.AddHttpClient<ILlmClient, OllamaLlmClient>(
-//    client =>
-//    {
-//        client.BaseAddress =
-//            new Uri("http://localhost:11434");
-//        client.Timeout = TimeSpan.FromMinutes(2);
-//    });
+// --------------------------------------------------
+// MCP server
+// --------------------------------------------------
 
 builder.Services
-    .AddHttpClient<ILlmClient, OllamaLlmClient>(client =>
-    {
-        client.BaseAddress = new Uri("http://127.0.0.1:11434");
-    })
-    .ConfigurePrimaryHttpMessageHandler(() =>
-        new SocketsHttpHandler
-        {
-            UseProxy = false
-        });
-
-builder.Services.AddScoped<AirportOperationsAgent>();
-
-builder.Services.AddScoped<IAgent>(
-    provider => provider.GetRequiredService<AirportOperationsAgent>());
-
-builder.Services.AddScoped<IAgentOrchestrator, AgentOrchestrator>();
-
-builder.Services.AddSingleton<GateQueryService>();
-
-builder.Services.AddScoped<GateAgent>();
-
-builder.Services.AddScoped<IAgent>(
-    provider => provider.GetRequiredService<GateAgent>());
-
-builder.Services.AddMcpServer()
+    .AddMcpServer()
     .WithHttpTransport()
     .WithToolsFromAssembly();
 
-// Web client
+// --------------------------------------------------
+// CORS
+// --------------------------------------------------
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("WebClient", policy =>
@@ -176,11 +56,47 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// --------------------------------------------------
+// Development tools
+// --------------------------------------------------
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
+
+    app.MapGet(
+        "/api/debug/mcp-tools",
+        async (
+            IAgentToolGateway gateway,
+            CancellationToken cancellationToken) =>
+        {
+            var tools = await gateway.ListToolsAsync(
+                cancellationToken);
+
+            return Results.Ok(tools);
+        });
+
+    app.MapGet(
+        "/api/debug/mcp-flights",
+        async (
+            IAgentToolGateway gateway,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await gateway.CallToolAsync(
+                "get_flights",
+                new Dictionary<string, object?>(),
+                cancellationToken);
+
+            return Results.Text(
+                result,
+                "application/json");
+        });
 }
+
+// --------------------------------------------------
+// Startup diagnostics
+// --------------------------------------------------
 
 using (var scope = app.Services.CreateScope())
 {
@@ -194,48 +110,39 @@ using (var scope = app.Services.CreateScope())
         $"Loaded {flights.Count} flights.");
 
     Console.WriteLine(
-        $"Arrivals: {flights.Count(f => f.Type == FlightType.Arrival)}");
+        $"Arrivals: {flights.Count(
+            f => f.Type == FlightType.Arrival)}");
 
     Console.WriteLine(
-        $"Departures: {flights.Count(f => f.Type == FlightType.Departure)}");
+        $"Departures: {flights.Count(
+            f => f.Type == FlightType.Departure)}");
 }
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapGet("/api/debug/mcp-tools",
-        async (
-            IAgentToolGateway gateway,
-            CancellationToken cancellationToken) =>
-        {
-            var tools = await gateway.ListToolsAsync(
-                cancellationToken);
+// --------------------------------------------------
+// Middleware
+// --------------------------------------------------
 
-            return Results.Ok(tools);
-    });
+app.UseHttpsRedirection();
 
-    app.MapGet("/api/debug/mcp-flights",
-        async (
-            IAgentToolGateway gateway,
-            CancellationToken cancellationToken) =>
-        {
-            var result = await gateway.CallToolAsync(
-                "get_flights",
-                new Dictionary<string, object?>(),
-                cancellationToken);
+app.UseCors("WebClient");
 
-            return Results.Text(result, "application/json");
-        });
-}
+// --------------------------------------------------
+// Endpoints
+// --------------------------------------------------
+
+app.MapControllers();
 
 app.MapMcp("/mcp");
 
-app.MapPost("/api/assistant/query",
+app.MapPost(
+    "/api/assistant/query",
     async (
         AssistantQueryRequest request,
         IAgentOrchestrator orchestrator,
         CancellationToken cancellationToken) =>
     {
-        var agentName = request.AgentName ?? "airport-operations";
+        var agentName =
+            request.AgentName ?? "airport-operations";
 
         var result = await orchestrator.ExecuteAsync(
             agentName,
@@ -245,14 +152,15 @@ app.MapPost("/api/assistant/query",
         return Results.Ok(result);
     });
 
-app.UseHttpsRedirection();
-
-app.UseCors("WebClient");
-
-app.MapControllers();
-
 app.Run();
+
+// --------------------------------------------------
+// Request models
+// --------------------------------------------------
 
 public sealed record AssistantQueryRequest(
     string Question,
     string? AgentName = null);
+
+// Make Program accessible to tests
+public partial class Program;

@@ -1,10 +1,10 @@
-﻿using OpsLattice.Simulator.Time;
+using OpsLattice.Simulator.Time;
 
 namespace OpsLattice.Scenarios.Airport.Flights;
 
 public sealed class FlightArrivalProcessor
 {
-    private static readonly TimeSpan ApproachDuration =
+    private static readonly TimeSpan _approachDuration =
         TimeSpan.FromMinutes(10);
 
     private readonly ISimulationClock _clock;
@@ -31,7 +31,7 @@ public sealed class FlightArrivalProcessor
         if (flight.Status == FlightStatus.Approaching &&
             flight.ApproachStartedAt.HasValue &&
             _clock.CurrentTime >=
-            flight.ApproachStartedAt.Value + ApproachDuration)
+            flight.ApproachStartedAt.Value + _approachDuration)
         {
             flight.Land(_clock.CurrentTime);
         }

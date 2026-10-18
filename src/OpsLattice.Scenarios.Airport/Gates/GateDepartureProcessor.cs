@@ -1,11 +1,11 @@
-﻿using OpsLattice.Scenarios.Airport.Flights;
+using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Simulator.Time;
 
 namespace OpsLattice.Scenarios.Airport.Gates;
 
 public sealed class GateDepartureProcessor
 {
-    private static readonly TimeSpan TurnaroundDuration =
+    private static readonly TimeSpan _turnaroundDuration =
         TimeSpan.FromMinutes(30);
 
     private readonly ISimulationClock _clock;
@@ -29,7 +29,7 @@ public sealed class GateDepartureProcessor
         }
 
         return flight.ArrivedAtGateAt.Value +
-               TurnaroundDuration;
+               _turnaroundDuration;
     }
 
     public void Process(Flight flight)
@@ -46,7 +46,7 @@ public sealed class GateDepartureProcessor
         }
 
         if (_clock.CurrentTime <
-            flight.ArrivedAtGateAt.Value + TurnaroundDuration)
+            flight.ArrivedAtGateAt.Value + _turnaroundDuration)
         {
             return;
         }
