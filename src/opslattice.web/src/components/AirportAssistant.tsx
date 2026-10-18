@@ -188,14 +188,21 @@ export default function AirportAssistant() {
               </p>
 
               <pre
-                style={{
-                  background: "#f5f5f5",
-                  padding: 12,
-                  overflowX: "auto",
-                }}
-              >
-                {execution.result}
-              </pre>
+                  style={{
+                    backgroundColor: "#1e1e1e",
+                    color: "#ffffff",
+                    fontFamily: "Consolas, 'Cascadia Code', monospace",
+                    fontSize: "13px",
+                    lineHeight: 1.6,
+                    padding: "16px",
+                    borderRadius: "8px",
+                    overflowX: "auto",
+                    whiteSpace: "pre-wrap",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {JSON.stringify(JSON.parse(execution.result), null, 2)}
+                </pre>
             </div>
           ))}
         </div>
