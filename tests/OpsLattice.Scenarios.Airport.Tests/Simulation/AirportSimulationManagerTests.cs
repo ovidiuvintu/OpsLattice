@@ -111,4 +111,91 @@ public sealed class AirportSimulationManagerTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             manager.Advance(TimeSpan.FromMinutes(-1)));
     }
+
+    [Fact]
+    public void GetFlights_WithActiveSimulation_ShouldReturnFlightSnapshots()
+    {
+        var setupService = new AirportSimulationSetupService(
+            new TerminalGenerator(),
+            new GateGenerator(),
+            new FlightScheduleGenerator());
+
+        var configuration = new AirportSetupConfiguration(
+            Terminals:
+            [
+                new TerminalSetupConfiguration("A", 5)
+            ],
+            FlightCount: 10,
+            ScheduleDate: new DateOnly(2026, 10, 6),
+            RandomSeed: 42);
+
+        var definition = setupService.Build(configuration);
+
+        var runtime = new AirportSimulationRuntimeFactory()
+            .Create(definition);
+
+        var manager = new AirportSimulationManager();
+        manager.Activate(runtime);
+
+        var flights = manager.GetFlights();
+
+        Assert.Equal(10, flights.Count);
+        Assert.All(flights, flight =>
+            Assert.False(string.IsNullOrWhiteSpace(flight.FlightNumber)));
+    }
+    [Fact]
+    public void GetFlights_WithoutActiveSimulation_ShouldThrow()
+    {
+        var manager = new AirportSimulationManager();
+
+        Assert.Throws<InvalidOperationException>(
+            () => manager.GetFlights());
+    }
+
+    [Fact]
+    public void GetFlights_WhenGateIsAssigned_ShouldIncludeGateCode()
+    {
+        // Arrange
+        var setupService = new AirportSimulationSetupService(
+            new TerminalGenerator(),
+            new GateGenerator(),
+            new FlightScheduleGenerator());
+
+        var configuration = new AirportSetupConfiguration(
+            Terminals:
+            [
+                new TerminalSetupConfiguration("A", 5)
+            ],
+            FlightCount: 10,
+            ScheduleDate: new DateOnly(2026, 10, 6),
+            RandomSeed: 42);
+
+        var definition = setupService.Build(configuration);
+
+        var runtime = new AirportSimulationRuntimeFactory()
+            .Create(definition);
+
+        // Select a flight and an available gate.
+        var flight = runtime.Definition.Flights.First();
+        var gate = runtime.Definition.Gates.First();
+
+        // Assign the flight to the gate.
+        gate.Assign(flight);
+
+        // Activate the simulation.
+        var manager = new AirportSimulationManager();
+        manager.Activate(runtime);
+
+        // Act
+        var flights = manager.GetFlights();
+
+        var snapshot = flights.Single(
+            f => f.FlightNumber == flight.FlightNumber);
+
+        // Assert
+        Assert.Equal(gate.Code, snapshot.Gate);
+        Assert.Equal(flight.FlightNumber, snapshot.FlightNumber);
+        Assert.Equal(flight.Status.ToString(), snapshot.Status);
+    }
+
 }

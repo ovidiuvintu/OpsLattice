@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using ModelContextProtocol.Server;
 using OpsLattice.Scenarios.Airport.Flights;
 
@@ -15,8 +15,8 @@ public sealed class FlightTools(
 
     [McpServerTool(Name = "get_flight_summary", ReadOnly = true)]
     [Description(
-        "Returns the total number of flights and the number " +
-        "of scheduled flights. Use this tool for flight counts.")]
+    "Returns the total number of flights and the number " +
+    "of scheduled flights. Use this tool for flight counts.")]
     public FlightSummaryDto GetFlightSummary()
     {
         var flights = flightQueryService.GetFlights();
@@ -24,7 +24,7 @@ public sealed class FlightTools(
         return new FlightSummaryDto(
             Total: flights.Count,
             Scheduled: flights.Count(
-                f => f.Status == FlightStatus.Scheduled)
+                f => f.Status == nameof(FlightStatus.Scheduled))
         );
     }
 }

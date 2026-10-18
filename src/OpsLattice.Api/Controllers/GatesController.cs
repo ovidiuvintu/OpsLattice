@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using OpsLattice.Api.Models;
 using OpsLattice.Scenarios.Airport.Gates;
 
@@ -8,38 +8,36 @@ namespace OpsLattice.Api.Controllers;
 [Route("api/gates")]
 public sealed class GatesController : ControllerBase
 {
-    private readonly IGateProvider _gateProvider;
+    private readonly GateQueryService _gateQueryService;
 
-    public GatesController(
-        IGateProvider gateProvider)
+    public GatesController(GateQueryService gateQueryService)
     {
-        _gateProvider = gateProvider;
+        _gateQueryService = gateQueryService;
     }
 
     [HttpGet]
     public ActionResult<IReadOnlyCollection<GateResponse>> Get()
     {
-        var gates = _gateProvider
-            .GetGates()
-            .Select(gate =>
-                new GateResponse(
-                    gate.Code,
-                    GetStatus(gate),
-                    gate.AssignedFlight?.FlightNumber,
-                    gate.OccupyingFlight?.FlightNumber))
+        var gates = _gateQueryService
+            .GetGateStatuses()
+            .Select(gate => new GateResponse(
+                gate.Code,
+                GetStatus(gate.IsAssigned, gate.IsOccupied),
+                gate.AssignedFlightNumber,
+                gate.OccupyingFlightNumber))
             .ToArray();
 
         return Ok(gates);
     }
 
-    private static string GetStatus(Gate gate)
+    private static string GetStatus(bool isAssigned, bool isOccupied)
     {
-        if (gate.IsOccupied)
+        if (isOccupied)
         {
             return "Occupied";
         }
 
-        if (gate.IsAssigned)
+        if (isAssigned)
         {
             return "Assigned";
         }

@@ -61,4 +61,62 @@ public sealed class AirportSimulationManager
             throw new InvalidOperationException(
                 "No active airport simulation exists.");
     }
+
+    public IReadOnlyList<FlightSnapshot> GetFlights()
+    {
+        lock (_sync)
+        {
+            var runtime = GetActiveRuntime();
+
+            var gates = runtime.Definition.Gates;
+
+            return runtime.Definition.Flights
+                .Select(flight =>
+                {
+                    var assignedGate = gates.FirstOrDefault(
+                        gate => ReferenceEquals(
+                            gate.AssignedFlight, flight));
+
+                    var occupiedGate = gates.FirstOrDefault(
+                        gate => ReferenceEquals(
+                            gate.OccupyingFlight, flight));
+
+                    return new FlightSnapshot(
+                        flight.FlightNumber,
+                        flight.Airline,
+                        flight.Type.ToString(),
+                        flight.Origin,
+                        flight.Destination,
+                        flight.ScheduledTime,
+                        flight.Status.ToString(),
+                        flight.ApproachStartedAt,
+                        flight.LandedAt,
+                        flight.ArrivedAtGateAt,
+                        assignedGate?.Code,
+                        occupiedGate?.Code);
+                })
+                .ToArray();
+        }
+    }
+
+    public IReadOnlyList<GateSnapshot> GetGates()
+    {
+        lock (_sync)
+        {
+            var runtime = GetActiveRuntime();
+
+            return runtime.Definition.Gates
+                .Select(gate => new GateSnapshot(
+                    Code: gate.Code,
+                    TerminalCode: gate.TerminalCode,
+                    IsAssigned: gate.IsAssigned,
+                    IsOccupied: gate.IsOccupied,
+                    IsAvailable: !gate.IsAssigned && !gate.IsOccupied,
+                    AssignedFlightNumber:
+                        gate.AssignedFlight?.FlightNumber,
+                    OccupyingFlightNumber:
+                        gate.OccupyingFlight?.FlightNumber))
+                .ToArray();
+        }
+    }
 }

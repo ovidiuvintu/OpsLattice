@@ -1,6 +1,6 @@
-using Moq;
 using OpsLattice.Scenarios.Airport.Flights;
-using OpsLattice.Scenarios.Airport.Gates;
+using OpsLattice.Scenarios.Airport.Setup;
+using OpsLattice.Scenarios.Airport.Simulation;
 using Xunit;
 
 namespace OpsLattice.Scenarios.Airport.Tests.Flights;
@@ -11,44 +11,43 @@ public sealed class FlightQueryServiceTests
     public void GetFlightStatuses_WhenFlightHasAssignedGate_ReturnsGateCode()
     {
         // Arrange
-        var flight = new Flight
-        {
-            FlightNumber = "UA123",
-            Airline = "United",
-            Origin = "ORD",
-            Destination = "IAH",
-            ScheduledTime = new DateTimeOffset(
-                2026, 10, 6, 14, 30, 0, TimeSpan.Zero),
-            Type = FlightType.Arrival
-        };
+        var setupService = new AirportSimulationSetupService(
+            new TerminalGenerator(),
+            new GateGenerator(),
+            new FlightScheduleGenerator());
 
-        var gate = new Gate("B10");
+        var configuration = new AirportSetupConfiguration(
+            Terminals:
+            [
+                new TerminalSetupConfiguration("B", 5)
+            ],
+            FlightCount: 10,
+            ScheduleDate: new DateOnly(2026, 10, 6),
+            RandomSeed: 42);
+
+        var definition = setupService.Build(configuration);
+
+        var runtime = new AirportSimulationRuntimeFactory()
+            .Create(definition);
+
+        var flight = runtime.Definition.Flights.First();
+        var gate = runtime.Definition.Gates.First();
+
         gate.Assign(flight);
 
-        var flightProvider = new Mock<IFlightProvider>();
+        var manager = new AirportSimulationManager();
+        manager.Activate(runtime);
 
-        flightProvider
-            .Setup(x => x.GetFlights())
-            .Returns([flight]);
-
-        var gateProvider = new Mock<IGateProvider>();
-
-        gateProvider
-            .Setup(x => x.GetGates())
-            .Returns([gate]);
-
-        var service = new FlightQueryService(
-            flightProvider.Object,
-            gateProvider.Object);
+        var service = new FlightQueryService(manager);
 
         // Act
-        var result = Assert.Single(
-            service.GetFlightStatuses());
+        var result = service.GetFlightStatuses()
+            .Single(f => f.FlightNumber == flight.FlightNumber);
 
         // Assert
-        Assert.Equal("UA123", result.FlightNumber);
+        Assert.Equal(flight.FlightNumber, result.FlightNumber);
         Assert.Equal("Scheduled", result.Status);
-        Assert.Equal("B10", result.AssignedGate);
+        Assert.Equal(gate.Code, result.AssignedGate);
         Assert.Null(result.OccupiedGate);
     }
 }

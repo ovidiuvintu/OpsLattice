@@ -1,37 +1,23 @@
-﻿using OpsLattice.Scenarios.Airport.Gates;
+using OpsLattice.Scenarios.Airport.Simulation;
 
 namespace OpsLattice.Scenarios.Airport.Flights;
 
 public sealed class FlightQueryService(
-    IFlightProvider flightProvider,
-    IGateProvider gateProvider)
+    AirportSimulationManager manager)
 {
-    public IReadOnlyCollection<Flight> GetFlights()
+    public IReadOnlyCollection<FlightSnapshot> GetFlights()
     {
-        return flightProvider.GetFlights();
+        return manager.GetFlights();
     }
 
     public IReadOnlyCollection<FlightStatusDto> GetFlightStatuses()
     {
-        var gates = gateProvider.GetGates();
-
-        return flightProvider.GetFlights()
-            .Select(flight =>
-            {
-                var assignedGate = gates.FirstOrDefault(
-                    gate => ReferenceEquals(
-                        gate.AssignedFlight, flight));
-
-                var occupiedGate = gates.FirstOrDefault(
-                    gate => ReferenceEquals(
-                        gate.OccupyingFlight, flight));
-
-                return new FlightStatusDto(
-                    flight.FlightNumber,
-                    flight.Status.ToString(),
-                    assignedGate?.Code,
-                    occupiedGate?.Code);
-            })
+        return manager.GetFlights()
+            .Select(flight => new FlightStatusDto(
+                flight.FlightNumber,
+                flight.Status,
+                flight.Gate,
+                flight.OccupiedGate))
             .ToArray();
     }
 }
