@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Agents;
+using OpsLattice.Agents.Execution;
 using OpsLattice.Agents.Infrastructure;
 using OpsLattice.Agents.Orchestration;
 using OpsLattice.Api.Infrastructure.Scheduling;
@@ -36,7 +37,8 @@ builder.Services.AddSingleton<IFlightProvider>(provider =>
     return new InMemoryFlightProvider(flights);
 });
 
-builder.Services.AddSingleton<IGateProvider, InMemoryGateProvider>();
+builder.Services.AddSingleton<IGateProvider>(
+    _ => new InMemoryGateProvider());
 
 builder.Services.AddSingleton<FlightQueryService>();
 
@@ -56,6 +58,8 @@ builder.Services.AddSingleton(
 builder.Services.AddSingleton<ISimulationClock>(
     provider =>
         provider.GetRequiredService<SimulationClock>());
+
+builder.Services.AddScoped<AgentRunner>();
 
 // Airport simulation processing
 builder.Services.AddSingleton<FlightArrivalProcessor>();
@@ -147,9 +151,16 @@ builder.Services.AddScoped<IAgent>(
 
 builder.Services.AddScoped<IAgentOrchestrator, AgentOrchestrator>();
 
+builder.Services.AddSingleton<GateQueryService>();
+
+builder.Services.AddScoped<GateAgent>();
+
+builder.Services.AddScoped<IAgent>(
+    provider => provider.GetRequiredService<GateAgent>());
+
 builder.Services.AddMcpServer()
     .WithHttpTransport()
-    .WithTools<FlightTools>();
+    .WithToolsFromAssembly();
 
 // Web client
 builder.Services.AddCors(options =>
@@ -224,8 +235,10 @@ app.MapPost("/api/assistant/query",
         IAgentOrchestrator orchestrator,
         CancellationToken cancellationToken) =>
     {
+        var agentName = request.AgentName ?? "airport-operations";
+
         var result = await orchestrator.ExecuteAsync(
-            "airport-operations",
+            agentName,
             request.Question,
             cancellationToken);
 
@@ -240,4 +253,6 @@ app.MapControllers();
 
 app.Run();
 
-public sealed record AssistantQueryRequest(string Question);
+public sealed record AssistantQueryRequest(
+    string Question,
+    string? AgentName = null);
