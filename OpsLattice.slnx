@@ -12,6 +12,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/OppsLattice.Agents.Tests/OpsLattice.Agents.Tests.csproj" Id="b3b5e5b8-64c9-4050-afc4-aa62193fe5a3" />
+    <Project Path="tests/OpsLattice.Api.IntegrationTests/OpsLattice.Api.IntegrationTests.csproj" />
     <Project Path="tests/OpsLattice.Architecture.Tests/OpsLattice.Architecture.Tests.csproj" Id="489cbb7e-d566-4258-96a8-acfc16df4d4e" />
     <Project Path="tests/OpsLattice.Core.Tests/OpsLattice.Core.Tests.csproj" Id="b03c80eb-57f3-497d-9438-ef48f8dbff12" />
     <Project Path="tests/OpsLattice.Scenarios.Airport.Tests/OpsLattice.Scenarios.Airport.Tests.csproj" Id="015e9f60-7821-46db-8457-09d5aac52793" />
