@@ -27,4 +27,22 @@ public sealed class FlightTools(
                 f => f.Status == nameof(FlightStatus.Scheduled))
         );
     }
+
+    [McpServerTool(Name = "get_flight_count")]
+    [Description(
+    "Counts flights in the active airport simulation. " +
+    "Optional filters include origin airport code, " +
+    "destination airport code, flight type and schedule date.")]
+    public int GetFlightCount(
+    string? origin = null,
+    string? destination = null,
+    string? flightType = null,
+    DateOnly? date = null)
+    {
+        return flightQueryService.CountFlights(
+            origin,
+            destination,
+            flightType,
+            date);
+    }
 }

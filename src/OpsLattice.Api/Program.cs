@@ -83,6 +83,7 @@ var manager = app.Services
 
 manager.Activate(runtime);
 
+
 // --------------------------------------------------
 // Development tools
 // --------------------------------------------------
@@ -170,3 +171,5 @@ public sealed record AssistantQueryRequest(
 
 // Make Program accessible to tests
 public partial class Program;
+
+

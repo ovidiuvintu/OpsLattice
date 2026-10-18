@@ -3,6 +3,8 @@ import { useState } from "react";
 
 type AgentName = "airport-operations" | "gate";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+
 interface AgentLlmExecution {
   iteration: number;
   durationMs: number;
@@ -52,7 +54,7 @@ export default function AirportAssistant() {
 
     try {
       const response = await fetch(
-        "http://localhost:5160/api/assistant/query",
+        `${API_BASE_URL}/api/assistant/query`,
         {
           method: "POST",
           headers: {
