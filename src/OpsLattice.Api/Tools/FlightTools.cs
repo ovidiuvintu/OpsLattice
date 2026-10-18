@@ -28,21 +28,21 @@ public sealed class FlightTools(
         );
     }
 
-    [McpServerTool(Name = "get_flight_count")]
+    [McpServerTool(Name = "get_flight_count", ReadOnly = true)]
     [Description(
-    "Counts flights in the active airport simulation. " +
-    "Optional filters include origin airport code, " +
-    "destination airport code, flight type and schedule date.")]
+    "Counts flights matching optional filters for origin, destination, " +
+    "flight type, scheduled date, and operational status. " +
+    "Use flightType only for Arrival or Departure. " +
+    "Use status for Scheduled, Approaching, Landed, or other flight statuses.")]
     public int GetFlightCount(
-    string? origin = null,
-    string? destination = null,
-    string? flightType = null,
-    DateOnly? date = null)
+        string? origin = null,
+        string? destination = null,
+        string? flightType = null,
+        DateOnly? date = null,
+        [Description("Operational flight status, e.g. Scheduled, Approaching, Landed.")]
+        string? status = null)
     {
         return flightQueryService.CountFlights(
-            origin,
-            destination,
-            flightType,
-            date);
+            origin, destination, flightType, date, status);
     }
 }
