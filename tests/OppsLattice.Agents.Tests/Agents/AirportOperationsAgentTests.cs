@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Agents;
+using OpsLattice.Agents.Execution;
 using OpsLattice.Agents.Models;
 using Xunit;
 
@@ -29,10 +30,12 @@ public sealed class AirportOperationsAgentTests
                 "No flights are currently waiting for gates.",
                 Array.Empty<AgentToolCall>()));
 
-        var agent = new AirportOperationsAgent(
+        var runner = new AgentRunner(
             llm.Object,
             gateway.Object,
-            NullLogger<AirportOperationsAgent>.Instance);
+            NullLogger<AgentRunner>.Instance);
+
+        var agent = new AirportOperationsAgent(runner);
 
         // Act
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(

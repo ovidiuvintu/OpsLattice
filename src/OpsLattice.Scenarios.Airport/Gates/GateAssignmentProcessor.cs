@@ -1,11 +1,11 @@
-﻿using OpsLattice.Scenarios.Airport.Flights;
+using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Simulator.Time;
 
 namespace OpsLattice.Scenarios.Airport.Gates;
 
 public sealed class GateAssignmentProcessor
 {
-    private static readonly TimeSpan AssignmentHorizon =
+    private static readonly TimeSpan _assignmentHorizon =
         TimeSpan.FromMinutes(60);
 
     private readonly ISimulationClock _clock;
@@ -38,7 +38,7 @@ public sealed class GateAssignmentProcessor
 
         // Do not assign a gate before the flight
         // enters the 60-minute planning horizon.
-        if (timeUntilArrival > AssignmentHorizon)
+        if (timeUntilArrival > _assignmentHorizon)
         {
             return;
         }
@@ -80,6 +80,6 @@ public sealed class GateAssignmentProcessor
             return null;
         }
 
-        return flight.ScheduledTime - AssignmentHorizon;
+        return flight.ScheduledTime - _assignmentHorizon;
     }
 }
