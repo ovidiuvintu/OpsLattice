@@ -1,11 +1,11 @@
 
-import { useState } from "react";
-
-type AgentName = "airport-operations" | "gate";
+import { useState, type FormEvent } from "react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-interface AgentLlmExecution {
+type AgentName = "airport-operations" | "gate-operations";
+
+interface LlmExecution {
   iteration: number;
   durationMs: number;
   requestedTools: boolean;
@@ -20,17 +20,38 @@ interface AgentToolExecution {
 }
 
 interface AgentExecutionResult {
-  executionId: string;
   answer: string;
-  totalDurationMs: number;
-  llmExecutions: AgentLlmExecution[];
-  toolExecutions: AgentToolExecution[];
+  agentName?: string;
+  executionId?: string;
+  totalDurationMs?: number;
+  llmExecutions?: LlmExecution[];
+  toolExecutions?: AgentToolExecution[];
 }
 
-const agents: { value: AgentName; label: string }[] = [
-  { value: "airport-operations", label: "Airport Operations" },
-  { value: "gate", label: "Gate Operations" },
-];
+function formatJson(value: unknown): string {
+  if (typeof value !== "string") {
+    return JSON.stringify(value ?? {}, null, 2);
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
+const codeStyle: React.CSSProperties = {
+  backgroundColor: "#1e1e1e",
+  color: "#ffffff",
+  fontFamily: "Consolas, 'Cascadia Code', monospace",
+  fontSize: "13px",
+  lineHeight: 1.6,
+  padding: "12px",
+  borderRadius: "8px",
+  overflowX: "auto",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+};
 
 export default function AirportAssistant() {
   const [agentName, setAgentName] =
@@ -43,10 +64,14 @@ export default function AirportAssistant() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!question.trim() || loading) return;
+    const trimmedQuestion = question.trim();
+
+    if (!trimmedQuestion || loading) {
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -61,21 +86,29 @@ export default function AirportAssistant() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            question: question.trim(),
+            question: trimmedQuestion,
             agentName,
           }),
         }
       );
 
       if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
+        const details = await response.text();
+
+        throw new Error(
+          `Assistant request failed (${response.status}): ${details}`
+        );
       }
 
-      const data: AgentExecutionResult = await response.json();
+      const data =
+        (await response.json()) as AgentExecutionResult;
+
       setResult(data);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unexpected error"
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred."
       );
     } finally {
       setLoading(false);
@@ -83,132 +116,200 @@ export default function AirportAssistant() {
   }
 
   return (
-    <div style={{ maxWidth: 800, padding: 24 }}>
-      <h2>OpsLattice AI Assistant</h2>
+    <section
+      style={{
+        border: "1px solid #d1d5db",
+        borderRadius: "10px",
+        padding: "16px",
+      }}
+    >
+      <h2 style={{ marginTop: 0 }}>Airport Assistant</h2>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: 16 }}>
-          <label htmlFor="agent">Agent</label>
+        <div style={{ marginBottom: "12px" }}>
+          <label htmlFor="agent-select">
+            <strong>Agent</strong>
+          </label>
 
           <select
-            id="agent"
+            id="agent-select"
             value={agentName}
-            onChange={(event) => {
-              setAgentName(event.target.value as AgentName);
-              setResult(null);
-              setError(null);
-            }}
+            onChange={(event) =>
+              setAgentName(event.target.value as AgentName)
+            }
             disabled={loading}
             style={{
               display: "block",
-              width: "100%",
-              padding: 10,
-              marginTop: 6,
+              marginTop: "6px",
+              padding: "8px",
+              minWidth: "220px",
             }}
           >
-            {agents.map((agent) => (
-              <option key={agent.value} value={agent.value}>
-                {agent.label}
-              </option>
-            ))}
+            <option value="airport-operations">
+              Airport Operations
+            </option>
+            <option value="gate-operations">
+              Gate Operations
+            </option>
           </select>
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label htmlFor="question">Question</label>
+        <div style={{ marginBottom: "12px" }}>
+          <label htmlFor="assistant-question">
+            <strong>Question</strong>
+          </label>
 
-          <input
-            id="question"
-            type="text"
+          <textarea
+            id="assistant-question"
             value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            placeholder="Ask about airport operations..."
+            onChange={(event) =>
+              setQuestion(event.target.value)
+            }
             disabled={loading}
+            placeholder="How many flights are going to DFW?"
+            rows={3}
             style={{
               display: "block",
+              boxSizing: "border-box",
               width: "100%",
-              padding: 10,
-              marginTop: 6,
+              marginTop: "6px",
+              padding: "10px",
+              fontFamily: "inherit",
+              fontSize: "14px",
             }}
           />
         </div>
 
-        <button type="submit" disabled={loading || !question.trim()}>
-          {loading ? "Running..." : "Ask Agent"}
+        <button
+          type="submit"
+          disabled={loading || !question.trim()}
+          style={{
+            padding: "9px 18px",
+            cursor: loading ? "wait" : "pointer",
+          }}
+        >
+          {loading ? "Processing..." : "Ask Assistant"}
         </button>
       </form>
 
       {error && (
-        <p style={{ color: "red", marginTop: 16 }}>{error}</p>
+        <div
+          role="alert"
+          style={{
+            marginTop: "16px",
+            color: "#b91c1c",
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {error}
+        </div>
       )}
 
       {result && (
-        <div style={{ marginTop: 24 }}>
+        <div style={{ marginTop: "20px" }}>
           <h3>Answer</h3>
-          <p>{result.answer}</p>
 
-          <h3>Execution Details</h3>
-
-          <p>
-            <strong>Agent:</strong> {agentName}
+          <p style={{ whiteSpace: "pre-wrap" }}>
+            {result.answer}
           </p>
 
-          <p>
-            <strong>Execution ID:</strong> {result.executionId}
-          </p>
+          <details style={{ marginTop: "20px" }} open>
+            <summary
+              style={{
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
+            >
+              Execution Details
+            </summary>
 
-          <p>
-            <strong>Total Duration:</strong>{" "}
-            {result.totalDurationMs} ms
-          </p>
-
-          <h4>LLM Executions</h4>
-
-          {result.llmExecutions.map((execution) => (
-            <div key={execution.iteration}>
+            <div style={{ marginTop: "12px" }}>
               <p>
-                Iteration {execution.iteration}:{" "}
-                {execution.durationMs} ms
+                <strong>Agent:</strong>{" "}
+                {result.agentName ?? agentName}
               </p>
 
-              <p>
-                Requested Tools:{" "}
-                {execution.requestedToolNames.length > 0
-                  ? execution.requestedToolNames.join(", ")
-                  : "None"}
-              </p>
+              {result.executionId && (
+                <p>
+                  <strong>Execution ID:</strong>{" "}
+                  {result.executionId}
+                </p>
+              )}
+
+              {result.totalDurationMs !== undefined && (
+                <p>
+                  <strong>Total Duration:</strong>{" "}
+                  {result.totalDurationMs} ms
+                </p>
+              )}
+
+              <h4>LLM Executions</h4>
+
+              {(result.llmExecutions ?? []).length === 0 ? (
+                <p>No LLM executions recorded.</p>
+              ) : (
+                result.llmExecutions!.map((execution, index) => (
+                  <div key={index}>
+                    <p>
+                      <strong>
+                        Iteration {execution.iteration}:
+                      </strong>{" "}
+                      {execution.durationMs} ms
+                    </p>
+
+                    <p>
+                      Requested Tools:{" "}
+                      {execution.requestedToolNames?.length
+                        ? execution.requestedToolNames.join(", ")
+                        : "None"}
+                    </p>
+                  </div>
+                ))
+              )}
+
+              <h4>MCP Tool Executions</h4>
+
+              {(result.toolExecutions ?? []).length === 0 ? (
+                <p>No MCP tool executions recorded.</p>
+              ) : (
+                result.toolExecutions!.map((execution, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      marginBottom: "20px",
+                      paddingBottom: "12px",
+                      borderBottom: "1px solid #e5e7eb",
+                    }}
+                  >
+                    <p>
+                      <strong>{execution.toolName}</strong>
+                      {" — "}
+                      {execution.durationMs} ms
+                    </p>
+
+                    <p>
+                      <strong>Arguments</strong>
+                    </p>
+
+                    <pre style={codeStyle}>
+                      {formatJson(execution.arguments)}
+                    </pre>
+
+                    <p>
+                      <strong>Result</strong>
+                    </p>    
+
+                    <pre style={codeStyle}>
+                      {formatJson(execution.result)}
+                    </pre>
+                  </div>
+                ))
+              )}
             </div>
-          ))}
-
-          <h4>MCP Tool Executions</h4>
-
-          {result.toolExecutions.map((execution, index) => (
-            <div key={index}>
-              <p>
-                <strong>{execution.toolName}</strong> —{" "}
-                {execution.durationMs} ms
-              </p>
-
-              <pre
-                  style={{
-                    backgroundColor: "#1e1e1e",
-                    color: "#ffffff",
-                    fontFamily: "Consolas, 'Cascadia Code', monospace",
-                    fontSize: "13px",
-                    lineHeight: 1.6,
-                    padding: "16px",
-                    borderRadius: "8px",
-                    overflowX: "auto",
-                    whiteSpace: "pre-wrap",
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {JSON.stringify(JSON.parse(execution.result), null, 2)}
-                </pre>
-            </div>
-          ))}
+          </details>
         </div>
       )}
-    </div>
+    </section>
   );
 }
+

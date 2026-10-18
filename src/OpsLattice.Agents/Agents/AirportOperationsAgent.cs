@@ -30,6 +30,9 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
         11. Keep responses concise unless details are requested.
         12. Do not discuss booking, travel advice, or hypothetical uses
             of the data unless explicitly requested.
+        13. Use flightType for Arrival or Departure.
+        14. Use status for Scheduled, Approaching, Landed, and other operational states.
+        15. When a user asks for "scheduled flights", filter by status=Scheduled.
         """;
 
     private static readonly string[] _allowedTools =

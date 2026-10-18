@@ -26,7 +26,8 @@ public sealed class FlightQueryService(
         string? origin = null,
         string? destination = null,
         string? flightType = null,
-        DateOnly? date = null)
+        DateOnly? date = null,
+        string? status = null)
     {
         IEnumerable<FlightSnapshot> flights = manager.GetFlights();
 
@@ -62,6 +63,15 @@ public sealed class FlightQueryService(
             flights = flights.Where(f =>
                 DateOnly.FromDateTime(f.ScheduledTime.UtcDateTime)
                     == date.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            flights = flights.Where(f =>
+                string.Equals(
+                    f.Status,
+                    status,
+                    StringComparison.OrdinalIgnoreCase));
         }
 
         return flights.Count();
