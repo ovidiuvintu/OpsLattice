@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Content Include="Data\OpsLattice_ATL_Daily_Flight_Schedule_2150.xlsx" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Dockerfile" />
   </ItemGroup>
 
   <ItemGroup>

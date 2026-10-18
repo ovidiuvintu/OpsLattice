@@ -1,8 +1,6 @@
 
-using OpsLattice.Api.Infrastructure.Scheduling;
 using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Gates;
-using OpsLattice.Scenarios.Airport.Scheduling;
 using OpsLattice.Scenarios.Airport.Setup;
 using OpsLattice.Scenarios.Airport.Simulation;
 using OpsLattice.Simulator.Simulation;
@@ -16,21 +14,6 @@ public static class AirportServiceCollectionExtensions
         this IServiceCollection services,
         IWebHostEnvironment environment)
     {
-        var scheduleDate = new DateOnly(2026, 10, 6);
-
-        services.AddSingleton<IFlightScheduleLoader>(
-            _ => new ExcelFlightScheduleLoader(
-                Path.Combine(
-                    environment.ContentRootPath,
-                    "Data",
-                    "OpsLattice_ATL_Daily_Flight_Schedule_2150.xlsx")));
-
-        services.AddSingleton<IFlightProvider>(provider =>
-        {
-            var loader = provider.GetRequiredService<IFlightScheduleLoader>();
-            return new InMemoryFlightProvider(loader.Load(scheduleDate));
-        });
-
         services.AddSingleton<IGateProvider>(
             _ => new InMemoryGateProvider());
 
