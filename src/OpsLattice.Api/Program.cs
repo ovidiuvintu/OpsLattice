@@ -3,7 +3,6 @@ using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Agents;
 using OpsLattice.Agents.Infrastructure;
 using OpsLattice.Api.Infrastructure.Scheduling;
-using OpsLattice.Api.Mcp;
 using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Gates;
 using OpsLattice.Scenarios.Airport.Scheduling;
@@ -121,13 +120,24 @@ builder.Services.AddSingleton<IFlightScheduleLoader>(
             "Data",
             "OpsLattice_ATL_Daily_Flight_Schedule_2150.xlsx")));
 
-builder.Services.AddHttpClient<ILlmClient, OllamaLlmClient>(
-    client =>
+//builder.Services.AddHttpClient<ILlmClient, OllamaLlmClient>(
+//    client =>
+//    {
+//        client.BaseAddress =
+//            new Uri("http://localhost:11434");
+//        client.Timeout = TimeSpan.FromMinutes(2);
+//    });
+
+builder.Services
+    .AddHttpClient<ILlmClient, OllamaLlmClient>(client =>
     {
-        client.BaseAddress =
-            new Uri("http://localhost:11434");
-        client.Timeout = TimeSpan.FromMinutes(2);
-    });
+        client.BaseAddress = new Uri("http://127.0.0.1:11434");
+    })
+    .ConfigurePrimaryHttpMessageHandler(() =>
+        new SocketsHttpHandler
+        {
+            UseProxy = false
+        });
 
 builder.Services.AddScoped<AirportOperationsAgent>();
 
@@ -202,23 +212,21 @@ if (app.Environment.IsDevelopment())
 
 app.MapMcp("/mcp");
 
-app.MapPost("/api/assistant/query",
+app.MapPost(
+    "/api/assistant/query",
     async (
         AssistantQueryRequest request,
         AirportOperationsAgent agent,
-        CancellationToken cancellationToken) =>
+        CancellationToken ct) =>
     {
         if (string.IsNullOrWhiteSpace(request.Question))
         {
-            return Results.BadRequest(
-                "Question is required.");
+            return Results.BadRequest("Question is required.");
         }
 
-        var answer = await agent.RunAsync(
-            request.Question,
-            cancellationToken);
+        var result = await agent.RunAsync(request.Question, ct);
 
-        return Results.Ok(new { answer });
+        return Results.Ok(result);
     });
 
 app.UseHttpsRedirection();
