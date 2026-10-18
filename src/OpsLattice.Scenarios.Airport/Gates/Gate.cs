@@ -1,4 +1,4 @@
-﻿using OpsLattice.Scenarios.Airport.Flights;
+using OpsLattice.Scenarios.Airport.Flights;
 
 namespace OpsLattice.Scenarios.Airport.Gates;
 
@@ -16,7 +16,22 @@ public sealed class Gate
         Code = code;
     }
 
+    public Gate(string code, string terminalCode)
+    : this(code)
+    {
+        if (string.IsNullOrWhiteSpace(terminalCode))
+        {
+            throw new ArgumentException(
+                "Terminal code is required.",
+                nameof(terminalCode));
+        }
+
+        TerminalCode = terminalCode;
+    }
+
     public string Code { get; }
+
+    public string? TerminalCode { get; }
 
     public Flight? AssignedFlight { get; private set; }
 
