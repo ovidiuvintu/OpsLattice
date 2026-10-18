@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Models;
@@ -8,7 +8,7 @@ namespace OpsLattice.Agents.Agents;
 public sealed class AirportOperationsAgent(
     ILlmClient llmClient,
     IAgentToolGateway toolGateway,
-    ILogger<AirportOperationsAgent> logger)
+    ILogger<AirportOperationsAgent> logger) : IAgent
 {
     private const int _maxIterations = 5;
 
@@ -27,6 +27,9 @@ public sealed class AirportOperationsAgent(
         If the tools cannot provide the requested information,
         explain what information is missing.
         """;
+
+    public string Name => "airport-operations";
+
     public async Task<AgentExecutionResult> RunAsync(
         string question,
         CancellationToken cancellationToken = default)

@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Agents;
 using OpsLattice.Agents.Infrastructure;
+using OpsLattice.Agents.Orchestration;
 using OpsLattice.Api.Infrastructure.Scheduling;
 using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Gates;
@@ -141,6 +142,11 @@ builder.Services
 
 builder.Services.AddScoped<AirportOperationsAgent>();
 
+builder.Services.AddScoped<IAgent>(
+    provider => provider.GetRequiredService<AirportOperationsAgent>());
+
+builder.Services.AddScoped<IAgentOrchestrator, AgentOrchestrator>();
+
 builder.Services.AddMcpServer()
     .WithHttpTransport()
     .WithTools<FlightTools>();
@@ -212,19 +218,16 @@ if (app.Environment.IsDevelopment())
 
 app.MapMcp("/mcp");
 
-app.MapPost(
-    "/api/assistant/query",
+app.MapPost("/api/assistant/query",
     async (
         AssistantQueryRequest request,
-        AirportOperationsAgent agent,
-        CancellationToken ct) =>
+        IAgentOrchestrator orchestrator,
+        CancellationToken cancellationToken) =>
     {
-        if (string.IsNullOrWhiteSpace(request.Question))
-        {
-            return Results.BadRequest("Question is required.");
-        }
-
-        var result = await agent.RunAsync(request.Question, ct);
+        var result = await orchestrator.ExecuteAsync(
+            "airport-operations",
+            request.Question,
+            cancellationToken);
 
         return Results.Ok(result);
     });
