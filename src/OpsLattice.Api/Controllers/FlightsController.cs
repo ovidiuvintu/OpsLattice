@@ -1,7 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using OpsLattice.Api.Models;
 using OpsLattice.Scenarios.Airport.Flights;
-using OpsLattice.Scenarios.Airport.Gates;
 
 namespace OpsLattice.Api.Controllers;
 
@@ -9,42 +8,29 @@ namespace OpsLattice.Api.Controllers;
 [Route("api/flights")]
 public sealed class FlightsController : ControllerBase
 {
-    private readonly IFlightProvider _flightProvider;
-    private readonly IGateProvider _gateProvider;
+    private readonly FlightQueryService _flightQueryService;
 
-    public FlightsController(
-        IFlightProvider flightProvider,
-        IGateProvider gateProvider)
+    public FlightsController(FlightQueryService flightQueryService)
     {
-        _flightProvider = flightProvider;
-        _gateProvider = gateProvider;
+        _flightQueryService = flightQueryService;
     }
 
     [HttpGet]
     public ActionResult<IReadOnlyCollection<FlightResponse>> Get()
     {
-        var gates = _gateProvider.GetGates();
-
-        var flights = _flightProvider
-            .GetFlights()
-            .Select(flight =>
-            {
-                var gate = gates.FirstOrDefault(
-                    gate => gate.AssignedFlight == flight);
-
-                return new FlightResponse(
-                    flight.FlightNumber,
-                    flight.Airline,
-                    flight.Type.ToString(),
-                    flight.Origin,
-                    flight.Destination,
-                    flight.ScheduledTime,
-                    flight.Status.ToString(),
-                    flight.ApproachStartedAt,
-                    flight.LandedAt,
-                    flight.ArrivedAtGateAt,
-                    gate?.Code);
-            })
+        var flights = _flightQueryService.GetFlights()
+            .Select(flight => new FlightResponse(
+                flight.FlightNumber,
+                flight.Airline,
+                flight.Type,
+                flight.Origin,
+                flight.Destination,
+                flight.ScheduledTime,
+                flight.Status,
+                flight.ApproachStartedAt,
+                flight.LandedAt,
+                flight.ArrivedAtGateAt,
+                flight.Gate))
             .ToArray();
 
         return Ok(flights);

@@ -3,6 +3,7 @@ using OpsLattice.Api.Infrastructure.Scheduling;
 using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Gates;
 using OpsLattice.Scenarios.Airport.Scheduling;
+using OpsLattice.Scenarios.Airport.Setup;
 using OpsLattice.Scenarios.Airport.Simulation;
 using OpsLattice.Simulator.Simulation;
 using OpsLattice.Simulator.Time;
@@ -70,6 +71,12 @@ public static class AirportServiceCollectionExtensions
                     provider.GetRequiredService<FlightDepartureSimulationStep>()
                 ]));
 
+        services.AddSingleton<TerminalGenerator>();
+        services.AddSingleton<GateGenerator>();
+        services.AddSingleton<FlightScheduleGenerator>();
+
+        services.AddSingleton<AirportSimulationSetupService>();
+        services.AddSingleton<AirportSimulationRuntimeFactory>();
         services.AddSingleton<AirportSimulationManager>();
 
         return services;

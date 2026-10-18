@@ -1,7 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using OpsLattice.Api.Models;
-using OpsLattice.Simulator.Simulation;
-using OpsLattice.Simulator.Time;
+using OpsLattice.Scenarios.Airport.Simulation;
 
 namespace OpsLattice.Api.Controllers;
 
@@ -9,23 +8,19 @@ namespace OpsLattice.Api.Controllers;
 [Route("api/simulation")]
 public sealed class SimulationController : ControllerBase
 {
-    private readonly SimulationRunner _runner;
-    private readonly ISimulationClock _clock;
+    private readonly AirportSimulationManager _manager;
 
-    public SimulationController(
-        SimulationRunner runner,
-        ISimulationClock clock)
+    public SimulationController(AirportSimulationManager manager)
     {
-        _runner = runner;
-        _clock = clock;
+        _manager = manager;
     }
 
     [HttpGet]
     public ActionResult<SimulationResponse> Get()
     {
-        return Ok(
-            new SimulationResponse(
-                _clock.CurrentTime));
+        var currentTime = _manager.GetCurrentTime();
+
+        return Ok(new SimulationResponse(currentTime));
     }
 
     [HttpPost("advance")]
@@ -34,15 +29,12 @@ public sealed class SimulationController : ControllerBase
     {
         if (request.Minutes <= 0)
         {
-            return BadRequest(
-                "Minutes must be greater than zero.");
+            return BadRequest("Minutes must be greater than zero.");
         }
 
-        _runner.Advance(
+        var currentTime = _manager.Advance(
             TimeSpan.FromMinutes(request.Minutes));
 
-        return Ok(
-            new SimulationResponse(
-                _clock.CurrentTime));
+        return Ok(new SimulationResponse(currentTime));
     }
 }

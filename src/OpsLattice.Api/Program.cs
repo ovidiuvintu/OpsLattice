@@ -4,6 +4,8 @@ using OpsLattice.Agents.Abstractions;
 using OpsLattice.Api.Extensions;
 using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Scheduling;
+using OpsLattice.Scenarios.Airport.Setup;
+using OpsLattice.Scenarios.Airport.Simulation;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -55,6 +57,32 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Initialize and activate the airport simulation.
+var setupService = app.Services
+    .GetRequiredService<AirportSimulationSetupService>();
+
+var configuration = new AirportSetupConfiguration(
+    Terminals:
+    [
+        new TerminalSetupConfiguration("A", 10),
+        new TerminalSetupConfiguration("B", 10)
+    ],
+    FlightCount: 100,
+    ScheduleDate: new DateOnly(2026, 10, 6),
+    RandomSeed: 42);
+
+var definition = setupService.Build(configuration);
+
+var runtimeFactory = app.Services
+    .GetRequiredService<AirportSimulationRuntimeFactory>();
+
+var runtime = runtimeFactory.Create(definition);
+
+var manager = app.Services
+    .GetRequiredService<AirportSimulationManager>();
+
+manager.Activate(runtime);
 
 // --------------------------------------------------
 // Development tools

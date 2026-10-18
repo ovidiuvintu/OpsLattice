@@ -1,40 +1,31 @@
+using OpsLattice.Scenarios.Airport.Simulation;
+
 namespace OpsLattice.Scenarios.Airport.Gates;
 
-public sealed class GateQueryService
+public sealed class GateQueryService(
+    AirportSimulationManager manager)
 {
-    private readonly IGateProvider _gateProvider;
-
-    public GateQueryService(IGateProvider gateProvider)
-    {
-        _gateProvider = gateProvider;
-    }
-
     public IReadOnlyCollection<GateStatusDto> GetGateStatuses()
     {
-        return _gateProvider.GetGates()
+        return manager.GetGates()
             .Select(gate => new GateStatusDto(
                 Code: gate.Code,
                 IsAssigned: gate.IsAssigned,
                 IsOccupied: gate.IsOccupied,
-                IsAvailable: !gate.IsAssigned && !gate.IsOccupied,
-                AssignedFlightNumber:
-                    gate.AssignedFlight?.FlightNumber,
-                OccupyingFlightNumber:
-                    gate.OccupyingFlight?.FlightNumber))
+                IsAvailable: gate.IsAvailable,
+                AssignedFlightNumber: gate.AssignedFlightNumber,
+                OccupyingFlightNumber: gate.OccupyingFlightNumber))
             .ToArray();
     }
 
     public GateSummaryDto GetGateSummary()
     {
-        var gates = _gateProvider.GetGates();
+        var gates = manager.GetGates();
 
         return new GateSummaryDto(
-            Total: gates.Count(),
-            Available: gates.Count(
-                gate => !gate.IsAssigned && !gate.IsOccupied),
-            Assigned: gates.Count(
-                gate => gate.IsAssigned),
-            Occupied: gates.Count(
-                gate => gate.IsOccupied));
+            Total: gates.Count,
+            Available: gates.Count(gate => gate.IsAvailable),
+            Assigned: gates.Count(gate => gate.IsAssigned),
+            Occupied: gates.Count(gate => gate.IsOccupied));
     }
 }
