@@ -19,6 +19,22 @@ public sealed class AgentRunnerTests
     private const string _toolResult =
         """{"total":3,"available":3,"assigned":0,"occupied":0}""";
 
+    private static AgentToolCallResult CreateSuccessToolResult(
+        string content)
+    {
+        return new AgentToolCallResult(
+            IsSuccess: true,
+            Content: content);
+    }
+
+    private static AgentToolCallResult CreateErrorToolResult(
+        string content)
+    {
+        return new AgentToolCallResult(
+            IsSuccess: false,
+            Content: content);
+    }
+
     private static AgentTool CreateGateSummaryTool()
     {
         return new AgentTool(
@@ -166,7 +182,7 @@ public sealed class AgentRunnerTests
                 _toolName,
                 It.IsAny<IReadOnlyDictionary<string, object?>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(_toolResult);
+            .ReturnsAsync(CreateSuccessToolResult(_toolResult));
 
         var runner = CreateRunner(llm, gateway);
 
@@ -224,7 +240,7 @@ public sealed class AgentRunnerTests
                 _toolName,
                 It.IsAny<IReadOnlyDictionary<string, object?>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(_toolResult);
+            .ReturnsAsync(CreateSuccessToolResult(_toolResult));
 
         var runner = CreateRunner(llm, gateway);
 
@@ -267,6 +283,107 @@ public sealed class AgentRunnerTests
                 It.IsAny<IReadOnlyDictionary<string, object?>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenToolReturnsRecoverableError_ShouldPassErrorBackToLlmAndAllowRetry()
+    {
+        // Arrange
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        SetupAvailableTools(gateway);
+
+        var toolCall = CreateGateSummaryCall();
+        const string toolError = "gateType must be one of A, B, or C.";
+        var llmIteration = 0;
+
+        llm.Setup(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((
+                IReadOnlyList<AgentMessage> messages,
+                IReadOnlyList<AgentTool> tools,
+                CancellationToken cancellationToken) =>
+            {
+                llmIteration++;
+
+                if (llmIteration == 1)
+                    return new AgentResponse(null, [toolCall]);
+
+                if (llmIteration == 2)
+                {
+                    Assert.Contains(messages, m =>
+                        m.Role == "tool" &&
+                        m.ToolName == _toolName &&
+                        m.Content == toolError);
+
+                    return new AgentResponse(null, [toolCall]);
+                }
+
+                return new AgentResponse("There are 3 available gates.", []);
+            });
+
+        gateway.SetupSequence(x => x.CallToolAsync(
+                _toolName,
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateErrorToolResult(toolError))
+            .ReturnsAsync(CreateSuccessToolResult(_toolResult));
+
+        var runner = CreateRunner(llm, gateway);
+
+        // Act
+        var result = await runner.RunAsync(
+            _agentName,
+            _systemPrompt,
+            [_toolName],
+            _question);
+
+        // Assert
+        Assert.Equal("There are 3 available gates.", result.Answer);
+        Assert.Equal(2, result.ToolExecutions.Count);
+        Assert.Equal(toolError, result.ToolExecutions[0].Result);
+        Assert.Equal(_toolResult, result.ToolExecutions[1].Result);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenAllToolExecutionsFail_ShouldThrowBeforeOperationalAnswer()
+    {
+        // Arrange
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        SetupAvailableTools(gateway);
+
+        var toolCall = CreateGateSummaryCall();
+
+        llm.SetupSequence(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse(null, [toolCall]))
+            .ReturnsAsync(new AgentResponse("There are 3 available gates.", []));
+
+        gateway.Setup(x => x.CallToolAsync(
+                _toolName,
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateErrorToolResult("invalid input."));
+
+        var runner = CreateRunner(llm, gateway);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runner.RunAsync(
+                _agentName,
+                _systemPrompt,
+                [_toolName],
+                _question));
+
+        // Assert
+        Assert.Contains("must execute an MCP tool before answering", exception.Message);
     }
 
     [Fact]

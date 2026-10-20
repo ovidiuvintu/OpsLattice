@@ -6,6 +6,31 @@ using OpsLattice.Scenarios.Airport.Flights;
 public sealed class FlightTools(
     FlightQueryService flightQueryService)
 {
+    private static string? ValidateFlightType(string? flightType)
+    {
+        if (string.IsNullOrWhiteSpace(flightType))
+            return null;
+
+        if (string.Equals(
+                flightType,
+                nameof(FlightType.Arrival),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return nameof(FlightType.Arrival);
+        }
+
+        if (string.Equals(
+                flightType,
+                nameof(FlightType.Departure),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return nameof(FlightType.Departure);
+        }
+
+        throw new ArgumentException(
+            "flightType must be 'Arrival' or 'Departure'. Omit flightType to include all flight types.");
+    }
+
     [McpServerTool(Name = "get_flights", ReadOnly = true)]
     [Description("Returns current flights and their statuses.")]
     public IReadOnlyCollection<FlightStatusDto> GetFlights()
@@ -47,6 +72,8 @@ public sealed class FlightTools(
     string? flightType = null,
     string? date = null)
     {
+        var validatedFlightType = ValidateFlightType(flightType);
+
         DateOnly? parsedDate = null;
 
         if (!string.IsNullOrWhiteSpace(date))
@@ -68,7 +95,7 @@ public sealed class FlightTools(
         return flightQueryService.CountFlights(
             origin,
             destination,
-            flightType,
+            validatedFlightType,
             parsedDate);
     }
 }

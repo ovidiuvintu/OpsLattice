@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using OpsLattice.Agents.Abstractions;
@@ -26,7 +26,7 @@ public sealed class McpAgentToolGateway(
         )).ToArray();
     }
 
-    public async Task<string> CallToolAsync(
+    public async Task<AgentToolCallResult> CallToolAsync(
         string name,
         IReadOnlyDictionary<string, object?> arguments,
         CancellationToken cancellationToken = default)
@@ -39,17 +39,25 @@ public sealed class McpAgentToolGateway(
             arguments,
             cancellationToken: cancellationToken);
 
+        var text = string.Join(
+            Environment.NewLine,
+            result.Content
+                .OfType<TextContentBlock>()
+                .Select(content => content.Text));
+
         if (result.IsError == true)
         {
-            throw new InvalidOperationException(
-                $"MCP tool '{name}' returned an error.");
+            if (string.IsNullOrWhiteSpace(text))
+                text = $"MCP tool '{name}' returned a validation error.";
+
+            return new AgentToolCallResult(
+                IsSuccess: false,
+                Content: text);
         }
 
-        var text = result.Content
-            .OfType<TextContentBlock>()
-            .Select(content => content.Text);
-
-        return string.Join(Environment.NewLine, text);
+        return new AgentToolCallResult(
+            IsSuccess: true,
+            Content: text);
     }
 
     private async Task<McpClient> CreateClientAsync(

@@ -117,7 +117,7 @@ if (app.Environment.IsDevelopment())
                 cancellationToken);
 
             return Results.Text(
-                result,
+                result.Content,
                 "application/json");
         });
 }
