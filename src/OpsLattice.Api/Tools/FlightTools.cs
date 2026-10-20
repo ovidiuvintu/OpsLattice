@@ -1,11 +1,15 @@
 using System.ComponentModel;
 using ModelContextProtocol.Server;
 using OpsLattice.Scenarios.Airport.Flights;
+using OpsLattice.Scenarios.Airport.Simulation;
 
 [McpServerToolType]
 public sealed class FlightTools(
     FlightQueryService flightQueryService)
 {
+    private const string _arrival = nameof(FlightType.Arrival);
+    private const string _departure = nameof(FlightType.Departure);
+
     private static string? ValidateFlightType(string? flightType)
     {
         if (string.IsNullOrWhiteSpace(flightType))
@@ -29,6 +33,56 @@ public sealed class FlightTools(
 
         throw new ArgumentException(
             "flightType must be 'Arrival' or 'Departure'. Omit flightType to include all flight types.");
+    }
+
+    private static string? ResolvePrimaryAirportCode(
+        IReadOnlyCollection<FlightSnapshot> flights)
+    {
+        return flights
+            .Where(f =>
+                (string.Equals(f.Type, _departure, StringComparison.OrdinalIgnoreCase)
+                 && !string.IsNullOrWhiteSpace(f.Origin))
+                ||
+                (string.Equals(f.Type, _arrival, StringComparison.OrdinalIgnoreCase)
+                 && !string.IsNullOrWhiteSpace(f.Destination)))
+            .Select(f => string.Equals(f.Type, _departure, StringComparison.OrdinalIgnoreCase)
+                ? f.Origin
+                : f.Destination)
+            .GroupBy(code => code, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(group => group.Count())
+            .Select(group => group.Key)
+            .FirstOrDefault();
+    }
+
+    private void ValidateDirectionalAirportUsage(
+        string? origin,
+        string? destination,
+        string? flightType)
+    {
+        if (string.IsNullOrWhiteSpace(flightType))
+            return;
+
+        var flights = flightQueryService.GetFlights();
+        var airportCode = ResolvePrimaryAirportCode(flights);
+
+        if (string.IsNullOrWhiteSpace(airportCode))
+            return;
+
+        if (string.Equals(flightType, _arrival, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(origin, airportCode, StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(destination))
+        {
+            throw new ArgumentException(
+                $"For arrivals at {airportCode}, use destination={airportCode}. origin={airportCode} with flightType=Arrival is likely reversed.");
+        }
+
+        if (string.Equals(flightType, _departure, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(destination, airportCode, StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(origin))
+        {
+            throw new ArgumentException(
+                $"For departures at {airportCode}, use origin={airportCode}. destination={airportCode} with flightType=Departure is likely reversed.");
+        }
     }
 
     [McpServerTool(Name = "get_flights", ReadOnly = true)]
@@ -73,6 +127,10 @@ public sealed class FlightTools(
     string? date = null)
     {
         var validatedFlightType = ValidateFlightType(flightType);
+        ValidateDirectionalAirportUsage(
+            origin,
+            destination,
+            validatedFlightType);
 
         DateOnly? parsedDate = null;
 

@@ -1,5 +1,6 @@
 
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Models;
@@ -126,10 +127,26 @@ public sealed class AgentRunner(
                     call.Arguments);
                 var toolStopwatch = Stopwatch.StartNew();
 
-                var toolResult = await toolGateway.CallToolAsync(
+                var argumentError = ValidateFlightCountDirection(
+                    question,
                     call.Name,
-                    call.Arguments,
-                    cancellationToken);
+                    call.Arguments);
+
+                AgentToolCallResult toolResult;
+
+                if (argumentError is not null)
+                {
+                    toolResult = new AgentToolCallResult(
+                        IsSuccess: false,
+                        Content: argumentError);
+                }
+                else
+                {
+                    toolResult = await toolGateway.CallToolAsync(
+                        call.Name,
+                        call.Arguments,
+                        cancellationToken);
+                }
 
                 toolStopwatch.Stop();
 
@@ -160,5 +177,91 @@ public sealed class AgentRunner(
 
         throw new InvalidOperationException(
             $"Agent '{agentName}' exceeded the maximum number of iterations.");
+    }
+
+    private static string? ValidateFlightCountDirection(
+        string question,
+        string toolName,
+        IReadOnlyDictionary<string, object?> arguments)
+    {
+        if (!string.Equals(
+                toolName,
+                "get_flight_count",
+                StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var flightType = GetStringArgument(arguments, "flightType");
+        var origin = GetStringArgument(arguments, "origin");
+        var destination = GetStringArgument(arguments, "destination");
+
+        if (string.Equals(
+                flightType,
+                "Arrival",
+                StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(origin)
+            && string.IsNullOrWhiteSpace(destination)
+            && MentionsAirportWithToken(question, origin, "at", "to"))
+        {
+            return $"For arrival counts at {origin}, use destination={origin}. origin={origin} with flightType=Arrival is likely reversed.";
+        }
+
+        if (string.Equals(
+                flightType,
+                "Departure",
+                StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(destination)
+            && string.IsNullOrWhiteSpace(origin)
+            && MentionsAirportWithToken(question, destination, "at", "from"))
+        {
+            return $"For departure counts at {destination}, use origin={destination}. destination={destination} with flightType=Departure is likely reversed.";
+        }
+
+        return null;
+    }
+
+    private static string? GetStringArgument(
+        IReadOnlyDictionary<string, object?> arguments,
+        string key)
+    {
+        if (!arguments.TryGetValue(key, out var value) || value is null)
+            return null;
+
+        if (value is string text)
+            return string.IsNullOrWhiteSpace(text) ? null : text;
+
+        if (value is System.Text.Json.JsonElement element)
+        {
+            if (element.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var textValue = element.GetString();
+                return string.IsNullOrWhiteSpace(textValue) ? null : textValue;
+            }
+
+            if (element.ValueKind is System.Text.Json.JsonValueKind.Null
+                or System.Text.Json.JsonValueKind.Undefined)
+            {
+                return null;
+            }
+        }
+
+        var converted = value.ToString();
+        return string.IsNullOrWhiteSpace(converted) ? null : converted;
+    }
+
+    private static bool MentionsAirportWithToken(
+        string question,
+        string airportCode,
+        params string[] tokens)
+    {
+        var escapedCode = Regex.Escape(airportCode);
+        var tokenPattern = string.Join("|", tokens.Select(Regex.Escape));
+        var pattern = $@"\b(?:{tokenPattern})\s+{escapedCode}\b";
+
+        return Regex.IsMatch(
+            question,
+            pattern,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 }
