@@ -88,13 +88,11 @@ public sealed class AgentRunner(
 
             if (response.ToolCalls.Count == 0)
             {
-                if (toolExecutions.Count == 0)
+                if (toolExecutions.Count == 0 &&
+                    response.Type != AgentResponseType.Clarification)
                 {
-                    logger.LogInformation(
-                        "Agent {AgentName} ({ExecutionId}): " +
-                        "No MCP tools executed. Returning clarification response.",
-                        agentName,
-                        executionId);
+                    throw new InvalidOperationException(
+                        $"Agent '{agentName}' must execute an MCP tool before answering.");
                 }
 
                 totalStopwatch.Stop();
