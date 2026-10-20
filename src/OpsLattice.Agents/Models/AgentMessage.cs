@@ -1,4 +1,4 @@
-﻿namespace OpsLattice.Agents.Models;
+namespace OpsLattice.Agents.Models;
 
 public sealed record AgentMessage(
     string Role,
@@ -17,4 +17,5 @@ public sealed record AgentTool(
 
 public sealed record AgentResponse(
     string? Content,
-    IReadOnlyList<AgentToolCall> ToolCalls);
+    IReadOnlyList<AgentToolCall> ToolCalls,
+    AgentResponseType Type = AgentResponseType.Answer);

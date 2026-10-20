@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using OpsLattice.Scenarios.Airport.Simulation;
-using OpsLattice.Simulator.Simulation;
 using Xunit;
 
 namespace OpsLattice.Api.IntegrationTests;
@@ -32,14 +31,17 @@ public sealed class ApplicationStartupTests
     }
 
     [Fact]
-    public void DependencyInjection_ShouldResolveSimulationRunner()
+    public void DependencyInjection_ShouldResolveAirportSimulationRuntimeFactory()
     {
+        // Arrange
         using var scope = _factory.Services.CreateScope();
 
-        var runner = scope.ServiceProvider
-            .GetRequiredService<SimulationRunner>();
+        // Act
+        var factory = scope.ServiceProvider
+            .GetRequiredService<AirportSimulationRuntimeFactory>();
 
-        Assert.NotNull(runner);
+        // Assert
+        Assert.NotNull(factory);
     }
 
     [Fact]

@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using OpsLattice.Agents.Abstractions;
+using OpsLattice.Agents.Agents;
 using OpsLattice.Agents.Models;
 using OpsLattice.Agents.Orchestration;
 using Xunit;
@@ -10,18 +11,18 @@ namespace OppsLattice.Agents.Tests.Execution;
 
 public sealed class AgentRunnerTests
 {
-    private const string AgentName = "gate";
-    private const string SystemPrompt = "Use MCP tools.";
-    private const string Question = "How many gates are available?";
-    private const string ToolName = "get_gate_summary";
+    private const string _agentName = "gate";
+    private const string _systemPrompt = "Use MCP tools.";
+    private const string _question = "How many gates are available?";
+    private const string _toolName = "get_gate_summary";
 
-    private const string ToolResult =
+    private const string _toolResult =
         """{"total":3,"available":3,"assigned":0,"occupied":0}""";
 
     private static AgentTool CreateGateSummaryTool()
     {
         return new AgentTool(
-            Name: ToolName,
+            Name: _toolName,
             Description: "Returns the current gate counts.",
             Parameters: new
             {
@@ -34,7 +35,7 @@ public sealed class AgentRunnerTests
     private static AgentToolCall CreateGateSummaryCall()
     {
         return new AgentToolCall(
-            ToolName,
+            _toolName,
             new Dictionary<string, object?>());
     }
 
@@ -87,9 +88,9 @@ public sealed class AgentRunnerTests
         // Act
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => runner.RunAsync(
-                AgentName,
-                SystemPrompt,
-                [ToolName],
+                _agentName,
+                _systemPrompt,
+                [_toolName],
                 "Delete flight UA123"));
 
         // Assert
@@ -124,10 +125,10 @@ public sealed class AgentRunnerTests
         // Act
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => runner.RunAsync(
-                AgentName,
-                SystemPrompt,
-                [ToolName],
-                Question));
+                _agentName,
+                _systemPrompt,
+                [_toolName],
+                _question));
 
         // Assert
         Assert.Contains(
@@ -162,20 +163,20 @@ public sealed class AgentRunnerTests
                 [toolCall]));
 
         gateway.Setup(x => x.CallToolAsync(
-                ToolName,
+                _toolName,
                 It.IsAny<IReadOnlyDictionary<string, object?>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ToolResult);
+            .ReturnsAsync(_toolResult);
 
         var runner = CreateRunner(llm, gateway);
 
         // Act
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => runner.RunAsync(
-                AgentName,
-                SystemPrompt,
-                [ToolName],
-                Question));
+                _agentName,
+                _systemPrompt,
+                [_toolName],
+                _question));
 
         // Assert
         Assert.Contains(
@@ -189,7 +190,7 @@ public sealed class AgentRunnerTests
             Times.Exactly(5));
 
         gateway.Verify(x => x.CallToolAsync(
-                ToolName,
+                _toolName,
                 It.IsAny<IReadOnlyDictionary<string, object?>>(),
                 It.IsAny<CancellationToken>()),
             Times.Exactly(5));
@@ -220,19 +221,19 @@ public sealed class AgentRunnerTests
                 []));
 
         gateway.Setup(x => x.CallToolAsync(
-                ToolName,
+                _toolName,
                 It.IsAny<IReadOnlyDictionary<string, object?>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ToolResult);
+            .ReturnsAsync(_toolResult);
 
         var runner = CreateRunner(llm, gateway);
 
         // Act
         var result = await runner.RunAsync(
-            AgentName,
-            SystemPrompt,
-            [ToolName],
-            Question);
+            _agentName,
+            _systemPrompt,
+            [_toolName],
+            _question);
 
         // Assert
         Assert.False(string.IsNullOrWhiteSpace(result.ExecutionId));
@@ -245,14 +246,14 @@ public sealed class AgentRunnerTests
 
         var execution = result.ToolExecutions[0];
 
-        Assert.Equal(ToolName, execution.ToolName);
-        Assert.Equal(ToolResult, execution.Result);
+        Assert.Equal(_toolName, execution.ToolName);
+        Assert.Equal(_toolResult, execution.Result);
 
         Assert.True(result.LlmExecutions[0].RequestedTools);
         Assert.False(result.LlmExecutions[1].RequestedTools);
 
         Assert.Contains(
-            ToolName,
+            _toolName,
             result.LlmExecutions[0].RequestedToolNames);
 
         llm.Verify(x => x.ChatAsync(
@@ -262,9 +263,55 @@ public sealed class AgentRunnerTests
             Times.Exactly(2));
 
         gateway.Verify(x => x.CallToolAsync(
-                ToolName,
+                _toolName,
                 It.IsAny<IReadOnlyDictionary<string, object?>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenLlmRequestsClarificationWithoutToolCall_ReturnsClarification()
+    {
+        // Arrange
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        gateway.Setup(x => x.ListToolsAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<AgentTool>());
+
+        llm.Setup(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse(
+                "Which year do you mean?",
+                Array.Empty<AgentToolCall>(),
+                AgentResponseType.Clarification));
+
+        var runner = new AgentRunner(
+            llm.Object,
+            gateway.Object,
+            NullLogger<AgentRunner>.Instance);
+
+        var agent = new AirportOperationsAgent(runner);
+
+        // Act
+        var result = await agent.RunAsync(
+            "How many flights on October 6?");
+
+        // Assert
+        Assert.Equal(
+            "Which year do you mean?",
+            result.Answer);
+
+        Assert.Empty(result.ToolExecutions);
+
+        gateway.Verify(
+            x => x.CallToolAsync(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }
