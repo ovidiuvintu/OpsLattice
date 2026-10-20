@@ -55,6 +55,25 @@ public sealed class AgentRunnerTests
             new Dictionary<string, object?>());
     }
 
+    private static AgentTool CreateFlightCountTool()
+    {
+        return new AgentTool(
+            Name: "get_flight_count",
+            Description: "Counts flights matching filters.",
+            Parameters: new
+            {
+                type = "object",
+                properties = new
+                {
+                    origin = new { type = "string" },
+                    destination = new { type = "string" },
+                    flightType = new { type = "string" },
+                    date = new { type = "string" }
+                },
+                required = Array.Empty<string>()
+            });
+    }
+
     private static void SetupAvailableTools(
         Mock<IAgentToolGateway> gateway)
     {
@@ -346,6 +365,93 @@ public sealed class AgentRunnerTests
         Assert.Equal(2, result.ToolExecutions.Count);
         Assert.Equal(toolError, result.ToolExecutions[0].Result);
         Assert.Equal(_toolResult, result.ToolExecutions[1].Result);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenFlightCountDirectionIsReversed_ShouldReturnRecoverableErrorWithoutCallingMcpAndAllowRetry()
+    {
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        gateway.Setup(x => x.ListToolsAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreateFlightCountTool()]);
+
+        var reversedCall = new AgentToolCall(
+            "get_flight_count",
+            new Dictionary<string, object?>
+            {
+                ["flightType"] = "Arrival",
+                ["origin"] = "IAH",
+                ["date"] = "2026-10-06"
+            });
+
+        var correctedCall = new AgentToolCall(
+            "get_flight_count",
+            new Dictionary<string, object?>
+            {
+                ["flightType"] = "Arrival",
+                ["destination"] = "IAH",
+                ["date"] = "2026-10-06"
+            });
+
+        var llmIteration = 0;
+
+        llm.Setup(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((
+                IReadOnlyList<AgentMessage> messages,
+                IReadOnlyList<AgentTool> tools,
+                CancellationToken cancellationToken) =>
+            {
+                llmIteration++;
+
+                if (llmIteration == 1)
+                    return new AgentResponse(null, [reversedCall]);
+
+                if (llmIteration == 2)
+                {
+                    Assert.Contains(messages, m =>
+                        m.Role == "tool"
+                        && m.ToolName == "get_flight_count"
+                        && m.Content is not null
+                        && m.Content.Contains("likely reversed", StringComparison.OrdinalIgnoreCase));
+
+                    return new AgentResponse(null, [correctedCall]);
+                }
+
+                return new AgentResponse("There are 50 arrivals.", []);
+            });
+
+        gateway.Setup(x => x.CallToolAsync(
+                "get_flight_count",
+                It.Is<IReadOnlyDictionary<string, object?>>(args =>
+                    args.ContainsKey("destination")
+                    && !args.ContainsKey("origin")),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessToolResult("50"));
+
+        var runner = CreateRunner(llm, gateway);
+
+        var result = await runner.RunAsync(
+            "airport-operations",
+            "Use MCP tools.",
+            ["get_flight_count"],
+            "How many arrivals are scheduled at IAH on October 6, 2026?");
+
+        Assert.Equal("There are 50 arrivals.", result.Answer);
+
+        Assert.Equal(2, result.ToolExecutions.Count);
+        Assert.False(string.IsNullOrWhiteSpace(result.ToolExecutions[0].Result));
+        Assert.Equal("50", result.ToolExecutions[1].Result);
+
+        gateway.Verify(x => x.CallToolAsync(
+                "get_flight_count",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

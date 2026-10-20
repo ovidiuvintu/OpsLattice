@@ -52,6 +52,39 @@ public sealed class FlightToolsTests
         Assert.Equal(expectedDepartures, departureResult);
     }
 
+    [Fact]
+    public void GetFlightCount_WithArrivalAndHomeAirportAsOriginOnly_ShouldThrowDirectionalValidationError()
+    {
+        var (tools, _) = CreateSut();
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => tools.GetFlightCount(
+                origin: "IAH",
+                flightType: "Arrival",
+                date: "2026-10-06"));
+
+        Assert.Contains("destination=IAH", exception.Message);
+    }
+
+    [Fact]
+    public void GetFlightCount_WithArrivalAndHomeAirportAsDestination_ShouldReturnMatchingCount()
+    {
+        var (tools, queryService) = CreateSut();
+
+        var expectedArrivalsToIah = queryService.GetFlights()
+            .Count(f =>
+                string.Equals(f.Type, nameof(FlightType.Arrival), StringComparison.Ordinal)
+                && string.Equals(f.Destination, "IAH", StringComparison.OrdinalIgnoreCase)
+                && DateOnly.FromDateTime(f.ScheduledTime.UtcDateTime) == new DateOnly(2026, 10, 6));
+
+        var result = tools.GetFlightCount(
+            destination: "IAH",
+            flightType: "Arrival",
+            date: "2026-10-06");
+
+        Assert.Equal(expectedArrivalsToIah, result);
+    }
+
     private static (FlightTools Tools, FlightQueryService QueryService) CreateSut()
     {
         var setupService = new AirportSimulationSetupService(
