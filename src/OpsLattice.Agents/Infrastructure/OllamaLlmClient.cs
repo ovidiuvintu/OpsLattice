@@ -180,7 +180,33 @@ public sealed class OllamaLlmClient(
             stageStopwatch.ElapsedMilliseconds,
             totalStopwatch.ElapsedMilliseconds);
 
-        return new AgentResponse(content, toolCalls);
+        const string clarificationPrefix = "CLARIFICATION:";
+
+        if (toolCalls.Count == 0 &&
+            content?.TrimStart().StartsWith(
+                clarificationPrefix,
+                StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var clarification = content.TrimStart();
+
+            clarification = clarification[clarificationPrefix.Length..].Trim();
+
+            if (string.IsNullOrWhiteSpace(clarification))
+            {
+                throw new InvalidOperationException(
+                    "Ollama returned an empty clarification.");
+            }
+
+            return new AgentResponse(
+                clarification,
+                toolCalls,
+                AgentResponseType.Clarification);
+        }
+
+        return new AgentResponse(
+            content,
+            toolCalls,
+            AgentResponseType.Answer);
     }
 
     public async Task<string> GenerateAsync(
