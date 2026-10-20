@@ -29,6 +29,7 @@ public sealed class AgentRunner(
 
         var llmExecutions = new List<AgentLlmExecution>();
         var toolExecutions = new List<AgentToolExecution>();
+        var hasSuccessfulToolExecution = false;
 
         var allowedNames = new HashSet<string>(
             allowedToolNames, StringComparer.Ordinal);
@@ -88,7 +89,7 @@ public sealed class AgentRunner(
 
             if (response.ToolCalls.Count == 0)
             {
-                if (toolExecutions.Count == 0 &&
+                if (!hasSuccessfulToolExecution &&
                     response.Type != AgentResponseType.Clarification)
                 {
                     throw new InvalidOperationException(
@@ -125,7 +126,7 @@ public sealed class AgentRunner(
                     call.Arguments);
                 var toolStopwatch = Stopwatch.StartNew();
 
-                var result = await toolGateway.CallToolAsync(
+                var toolResult = await toolGateway.CallToolAsync(
                     call.Name,
                     call.Arguments,
                     cancellationToken);
@@ -135,8 +136,13 @@ public sealed class AgentRunner(
                 toolExecutions.Add(new AgentToolExecution(
                     ToolName: call.Name,
                     Arguments: call.Arguments,
-                    Result: result,
+                    Result: toolResult.Content,
                     DurationMs: toolStopwatch.ElapsedMilliseconds));
+
+                if (toolResult.IsSuccess)
+                {
+                    hasSuccessfulToolExecution = true;
+                }
 
                 logger.LogInformation(
                     "Agent {AgentName} ({ExecutionId}): MCP tool {ToolName} completed in {DurationMs} ms",
@@ -147,7 +153,7 @@ public sealed class AgentRunner(
 
                 messages.Add(new AgentMessage(
                     "tool",
-                    result,
+                    toolResult.Content,
                     ToolName: call.Name));
             }
         }

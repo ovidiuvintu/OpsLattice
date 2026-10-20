@@ -15,6 +15,10 @@ public sealed record AgentTool(
     string Description,
     object Parameters);
 
+public sealed record AgentToolCallResult(
+    bool IsSuccess,
+    string Content);
+
 public sealed record AgentResponse(
     string? Content,
     IReadOnlyList<AgentToolCall> ToolCalls,
