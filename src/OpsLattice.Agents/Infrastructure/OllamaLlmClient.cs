@@ -3,13 +3,14 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Models;
 
 namespace OpsLattice.Agents.Infrastructure;
 
 public sealed class OllamaLlmClient(
-    HttpClient httpClient, ILogger<OllamaLlmClient> logger) : ILlmClient
+    HttpClient httpClient, IOptions<OllamaOptions> options, ILogger<OllamaLlmClient> logger) : ILlmClient
 {
     public async Task<AgentResponse> ChatAsync(
         IReadOnlyList<AgentMessage> messages,
@@ -68,7 +69,7 @@ public sealed class OllamaLlmClient(
 
         var request = new
         {
-            model = "qwen2.5:3b-instruct-q4_K_M",
+            model = options.Value.Model,
             messages = ollamaMessages,
             tools = ollamaTools,
             stream = false
@@ -188,7 +189,7 @@ public sealed class OllamaLlmClient(
     {
         var request = new
         {
-            model = "qwen2.5:3b-instruct-q4_K_M",
+            model = options.Value.Model,
             messages = new[]
             {
                 new { role = "user", content = prompt }
