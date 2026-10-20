@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Models;
 
-namespace OpsLattice.Agents.Execution;
+namespace OpsLattice.Agents.Orchestration;
 
 public sealed class AgentRunner(
     ILlmClient llmClient,
@@ -84,12 +84,17 @@ public sealed class AgentRunner(
                 llmStopwatch.ElapsedMilliseconds,
                 string.Join(", ", requestedToolNames));
 
+
+
             if (response.ToolCalls.Count == 0)
             {
                 if (toolExecutions.Count == 0)
                 {
-                    throw new InvalidOperationException(
-                        $"Agent '{agentName}' must execute an MCP tool before answering.");
+                    logger.LogInformation(
+                        "Agent {AgentName} ({ExecutionId}): " +
+                        "No MCP tools executed. Returning clarification response.",
+                        agentName,
+                        executionId);
                 }
 
                 totalStopwatch.Stop();
@@ -116,6 +121,10 @@ public sealed class AgentRunner(
                         $"Tool '{call.Name}' is not permitted for agent '{agentName}'.");
                 }
 
+                logger.LogInformation(
+                    "Calling MCP tool {ToolName} with arguments {@Arguments}",
+                    call.Name,
+                    call.Arguments);
                 var toolStopwatch = Stopwatch.StartNew();
 
                 var result = await toolGateway.CallToolAsync(

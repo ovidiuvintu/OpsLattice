@@ -2,8 +2,8 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using OpsLattice.Agents.Abstractions;
-using OpsLattice.Agents.Execution;
 using OpsLattice.Agents.Models;
+using OpsLattice.Agents.Orchestration;
 using Xunit;
 
 namespace OppsLattice.Agents.Tests.Execution;

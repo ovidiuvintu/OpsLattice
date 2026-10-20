@@ -15,8 +15,8 @@ public sealed class FlightTools(
 
     [McpServerTool(Name = "get_flight_summary", ReadOnly = true)]
     [Description(
-    "Returns the total number of flights and the number " +
-    "of scheduled flights. Use this tool for flight counts.")]
+        "Returns the total number of flights and the number " +
+        "of scheduled flights. Use this tool for flight counts.")]
     public FlightSummaryDto GetFlightSummary()
     {
         var flights = flightQueryService.GetFlights();
@@ -29,20 +29,46 @@ public sealed class FlightTools(
     }
 
     [McpServerTool(Name = "get_flight_count", ReadOnly = true)]
-    [Description(
-    "Counts flights matching optional filters for origin, destination, " +
-    "flight type, scheduled date, and operational status. " +
-    "Use flightType only for Arrival or Departure. " +
-    "Use status for Scheduled, Approaching, Landed, or other flight statuses.")]
+    [Description("""
+        Counts flights matching explicitly requested filters.
+
+        Only include the status parameter when the user explicitly
+        specifies an operational status, such as Scheduled,
+        Approaching, Landed, or Departed.
+
+        A flight's scheduled date does not imply status=Scheduled.
+
+        Omit status when the user requests all flights regardless
+        of their current operational state.
+        """)]
     public int GetFlightCount(
-        string? origin = null,
-        string? destination = null,
-        string? flightType = null,
-        DateOnly? date = null,
-        [Description("Operational flight status, e.g. Scheduled, Approaching, Landed.")]
-        string? status = null)
+    string? origin = null,
+    string? destination = null,
+    string? flightType = null,
+    string? date = null)
     {
+        DateOnly? parsedDate = null;
+
+        if (!string.IsNullOrWhiteSpace(date))
+        {
+            if (!DateOnly.TryParseExact(
+                    date,
+                    "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out var value))
+            {
+                throw new ArgumentException(
+                    "Date must be in YYYY-MM-DD format.");
+            }
+
+            parsedDate = value;
+        }
+
         return flightQueryService.CountFlights(
-            origin, destination, flightType, date, status);
+            origin,
+            destination,
+            flightType,
+            parsedDate);
     }
 }
