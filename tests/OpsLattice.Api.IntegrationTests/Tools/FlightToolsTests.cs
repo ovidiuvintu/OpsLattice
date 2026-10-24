@@ -85,6 +85,36 @@ public sealed class FlightToolsTests
         Assert.Equal(expectedArrivalsToIah, result);
     }
 
+    [Fact]
+    public void GetFlightCount_WithDepartureFromLaxToIah_ShouldThrowDirectionalValidationError()
+    {
+        var (tools, _) = CreateSut();
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => tools.GetFlightCount(
+                origin: "LAX",
+                destination: "IAH",
+                flightType: "Departure",
+                date: "2026-10-06"));
+
+        Assert.Contains("departure flights", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GetFlightCount_WithArrivalFromIahToLax_ShouldThrowDirectionalValidationError()
+    {
+        var (tools, _) = CreateSut();
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => tools.GetFlightCount(
+                origin: "IAH",
+                destination: "LAX",
+                flightType: "Arrival",
+                date: "2026-10-06"));
+
+        Assert.Contains("arrival flights", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static (FlightTools Tools, FlightQueryService QueryService) CreateSut()
     {
         var setupService = new AirportSimulationSetupService(

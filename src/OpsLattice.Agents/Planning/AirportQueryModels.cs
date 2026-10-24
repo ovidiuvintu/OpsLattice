@@ -90,3 +90,18 @@ public sealed record AirportPlannerOutput(
     AirportQueryPlanDraft? Plan,
     string? Error,
     string RawJson);
+
+public sealed record AirportQueryExecutionResult(
+    IReadOnlyList<AirportQueryExecutionItem> Items)
+{
+    public bool HasFailures => Items.Any(item => !item.IsSuccess);
+}
+
+public sealed record AirportQueryExecutionItem(
+    int QueryIndex,
+    AirportQuery Query,
+    bool IsSuccess,
+    string ToolName,
+    IReadOnlyDictionary<string, object?> Arguments,
+    string Result,
+    long DurationMs);

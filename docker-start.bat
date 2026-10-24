@@ -4,6 +4,14 @@ setlocal
 
 cd /d "%~dp0"
 
+set BUILD_ARGS=
+if /I "%~1"=="--no-cache" (
+    set BUILD_ARGS=--no-cache
+)
+if /I "%~1"=="/nocache" (
+    set BUILD_ARGS=--no-cache
+)
+
 echo ========================================
 echo       OpsLattice Docker Startup
 echo ========================================
@@ -20,7 +28,7 @@ if errorlevel 1 (
 
 echo.
 echo [2/4] Building Docker images...
-docker compose build
+docker compose build %BUILD_ARGS%
 if errorlevel 1 goto error
 
 echo.

@@ -228,7 +228,54 @@ public sealed class AgentRunnerTests
                 _toolName,
                 It.IsAny<IReadOnlyDictionary<string, object?>>(),
                 It.IsAny<CancellationToken>()),
-            Times.Exactly(5));
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenSameSuccessfulToolCallIsRepeated_ShouldReuseCachedResult()
+    {
+        // Arrange
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        SetupAvailableTools(gateway);
+
+        var toolCall = CreateGateSummaryCall();
+
+        llm.SetupSequence(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse(null, [toolCall]))
+            .ReturnsAsync(new AgentResponse(null, [toolCall]))
+            .ReturnsAsync(new AgentResponse("There are 3 available gates.", []));
+
+        gateway.Setup(x => x.CallToolAsync(
+                _toolName,
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessToolResult(_toolResult));
+
+        var runner = CreateRunner(llm, gateway);
+
+        // Act
+        var result = await runner.RunAsync(
+            _agentName,
+            _systemPrompt,
+            [_toolName],
+            _question);
+
+        // Assert
+        Assert.Equal("There are 3 available gates.", result.Answer);
+        Assert.Equal(2, result.ToolExecutions.Count);
+        Assert.Equal(_toolResult, result.ToolExecutions[0].Result);
+        Assert.Equal(_toolResult, result.ToolExecutions[1].Result);
+
+        gateway.Verify(x => x.CallToolAsync(
+                _toolName,
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

@@ -3,7 +3,10 @@ import { useState, type FormEvent } from "react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-type AgentName = "airport-operations" | "gate-operations";
+type AgentName =
+  | "airport-operations"
+  | "airport-operations-planned"
+  | "gate";
 
 interface LlmExecution {
   iteration: number;
@@ -124,6 +127,16 @@ export default function AirportAssistant() {
       }}
     >
       <h2 style={{ marginTop: 0 }}>Airport Assistant</h2>
+      <p
+        style={{
+          marginTop: "-6px",
+          marginBottom: "12px",
+          fontSize: "12px",
+          color: "#6b7280",
+        }}
+      >
+        UI version: planned-agent-selector-v1
+      </p>
 
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: "12px" }}>
@@ -146,9 +159,12 @@ export default function AirportAssistant() {
             }}
           >
             <option value="airport-operations">
-              Airport Operations
+              Airport Operations (Agentic)
             </option>
-            <option value="gate-operations">
+            <option value="airport-operations-planned">
+              Airport Operations (Planned)
+            </option>
+            <option value="gate">
               Gate Operations
             </option>
           </select>

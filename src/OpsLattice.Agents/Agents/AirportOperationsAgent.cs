@@ -119,11 +119,12 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
     5.1. Use get_flight_summary only for unfiltered totals
          and overall simulation statistics.
 
-    5.2. Use get_flight_count for questions asking how many
-         flights match specific criteria.
+    5.2. Use get_flight_count for count questions when the
+         requested filters are supported by that tool.
 
     5.3. Use get_flights when the user requests individual
-         flight details or flight listings.
+         flight details, flight listings, or counts by
+         current operational status.
 
     5.4. Do not call get_flights merely to calculate a count.
 
@@ -148,28 +149,40 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
          - Arrival
          - Departure
 
-    6.4. Use status for operational states such as:
-         - Scheduled
-         - Approaching
-         - Landed
-         - Departed
+    6.4. get_flight_count supports these filters only:
+         - origin
+         - destination
+         - flightType
+         - date
 
     6.5. Never confuse flightType with status.
 
-    6.6. When the user explicitly asks for flights with
-         operational status Scheduled, use status=Scheduled.
+    6.6. get_flight_count does not support status.
+         For status-based counts, call get_flights and
+         count matching statuses from the returned list.
 
     6.7. When the user asks how many flights are scheduled
          on a particular date, use the requested date.
-         Do not automatically add status=Scheduled unless
-         the user specifically asks for that operational
-         status.
+         Do not treat "scheduled on a date" as
+         status=Scheduled.
 
     6.8. Omit optional filters that the user did not request
          or that are not implied by the question.
 
     6.9. If the user specifies a date, always pass that
          date to the appropriate flight-query MCP tool.
+
+    6.10. Direction mapping for the simulation airport:
+          - Flights to IAH are arrivals.
+          - Flights from IAH are departures.
+
+    6.11. If user asks arrivals at/to IAH:
+          - Use flightType=Arrival and destination=IAH.
+          - Do not use origin=IAH.
+
+    6.12. If user asks departures at/from IAH:
+          - Use flightType=Departure and origin=IAH.
+          - Do not use destination=IAH.
 
     --------------------------------------------------
     7. MULTI-PART QUESTIONS
@@ -275,10 +288,10 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
     on October 6, 2026.
 
     Action:
-    Call get_flights with:
-    origin = IAH
-    destination = ORD
-    date = 2026-10-06
+    Call get_flights with no arguments.
+
+    Filter the returned flights in your reasoning to match
+    origin=IAH and destination=ORD.
 
     Return the matching flight details.
 
@@ -288,8 +301,9 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
     How many flights currently have status Scheduled?
 
     Action:
-    Call get_flight_count with:
-    status = Scheduled
+    Call get_flights with no arguments.
+
+    Count flights where status is Scheduled.
 
     Do not add a date filter unless requested.
 

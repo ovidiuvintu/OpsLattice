@@ -69,19 +69,33 @@ public sealed class FlightTools(
             return;
 
         if (string.Equals(flightType, _arrival, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(origin, airportCode, StringComparison.OrdinalIgnoreCase)
-            && string.IsNullOrWhiteSpace(destination))
+            && !string.IsNullOrWhiteSpace(destination)
+            && !string.Equals(destination, airportCode, StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException(
-                $"For arrivals at {airportCode}, use destination={airportCode}. origin={airportCode} with flightType=Arrival is likely reversed.");
+                $"Arrival flights require destination={airportCode} when destination is specified; received destination={destination}.");
+        }
+
+        if (string.Equals(flightType, _arrival, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(origin, airportCode, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                $"Arrival flights cannot use origin={airportCode}; use destination={airportCode} for arrivals at the primary airport.");
         }
 
         if (string.Equals(flightType, _departure, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(destination, airportCode, StringComparison.OrdinalIgnoreCase)
-            && string.IsNullOrWhiteSpace(origin))
+            && !string.IsNullOrWhiteSpace(origin)
+            && !string.Equals(origin, airportCode, StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException(
-                $"For departures at {airportCode}, use origin={airportCode}. destination={airportCode} with flightType=Departure is likely reversed.");
+                $"Departure flights require origin={airportCode} when origin is specified; received origin={origin}.");
+        }
+
+        if (string.Equals(flightType, _departure, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(destination, airportCode, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                $"Departure flights cannot use destination={airportCode}; use origin={airportCode} for departures from the primary airport.");
         }
     }
 

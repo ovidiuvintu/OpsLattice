@@ -1,5 +1,6 @@
 
 using System.Diagnostics;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using OpsLattice.Agents.Abstractions;
@@ -31,6 +32,8 @@ public sealed class AgentRunner(
         var llmExecutions = new List<AgentLlmExecution>();
         var toolExecutions = new List<AgentToolExecution>();
         var hasSuccessfulToolExecution = false;
+        var successfulToolCallCache =
+            new Dictionary<string, AgentToolCallResult>(StringComparer.Ordinal);
 
         var allowedNames = new HashSet<string>(
             allowedToolNames, StringComparer.Ordinal);
@@ -125,36 +128,57 @@ public sealed class AgentRunner(
                     "Calling MCP tool {ToolName} with arguments {@Arguments}",
                     call.Name,
                     call.Arguments);
-                var toolStopwatch = Stopwatch.StartNew();
+                AgentToolCallResult toolResult;
+                long toolDurationMs;
 
-                var argumentError = ValidateFlightCountDirection(
-                    question,
+                var callCacheKey = BuildToolCallCacheKey(
                     call.Name,
                     call.Arguments);
 
-                AgentToolCallResult toolResult;
-
-                if (argumentError is not null)
+                if (successfulToolCallCache.TryGetValue(
+                        callCacheKey,
+                        out var cachedToolResult))
                 {
-                    toolResult = new AgentToolCallResult(
-                        IsSuccess: false,
-                        Content: argumentError);
+                    toolResult = cachedToolResult;
+                    toolDurationMs = 0;
                 }
                 else
                 {
-                    toolResult = await toolGateway.CallToolAsync(
-                        call.Name,
-                        call.Arguments,
-                        cancellationToken);
-                }
+                    var toolStopwatch = Stopwatch.StartNew();
 
-                toolStopwatch.Stop();
+                    var argumentError = ValidateFlightCountDirection(
+                        question,
+                        call.Name,
+                        call.Arguments);
+
+                    if (argumentError is not null)
+                    {
+                        toolResult = new AgentToolCallResult(
+                            IsSuccess: false,
+                            Content: argumentError);
+                    }
+                    else
+                    {
+                        toolResult = await toolGateway.CallToolAsync(
+                            call.Name,
+                            call.Arguments,
+                            cancellationToken);
+
+                        if (toolResult.IsSuccess)
+                        {
+                            successfulToolCallCache[callCacheKey] = toolResult;
+                        }
+                    }
+
+                    toolStopwatch.Stop();
+                    toolDurationMs = toolStopwatch.ElapsedMilliseconds;
+                }
 
                 toolExecutions.Add(new AgentToolExecution(
                     ToolName: call.Name,
                     Arguments: call.Arguments,
                     Result: toolResult.Content,
-                    DurationMs: toolStopwatch.ElapsedMilliseconds));
+                    DurationMs: toolDurationMs));
 
                 if (toolResult.IsSuccess)
                 {
@@ -166,7 +190,7 @@ public sealed class AgentRunner(
                     agentName,
                     executionId,
                     call.Name,
-                    toolStopwatch.ElapsedMilliseconds);
+                    toolDurationMs);
 
                 messages.Add(new AgentMessage(
                     "tool",
@@ -263,5 +287,19 @@ public sealed class AgentRunner(
             question,
             pattern,
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    private static string BuildToolCallCacheKey(
+        string toolName,
+        IReadOnlyDictionary<string, object?> arguments)
+    {
+        var orderedArguments = arguments
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value,
+                StringComparer.Ordinal);
+
+        return $"{toolName}:{JsonSerializer.Serialize(orderedArguments)}";
     }
 }

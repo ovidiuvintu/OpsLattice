@@ -5,6 +5,8 @@ namespace OpsLattice.Agents.Planning;
 
 public sealed class AirportQueryValidator : IAirportQueryValidator
 {
+    private const string _primaryAirportCode = "IAH";
+
     private static readonly HashSet<string> _relativeDates =
     [
         "today",
@@ -66,7 +68,14 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
 
             if (!TryParseFlightType(query.FlightType, out var flightType))
             {
-                errors.Add($"{prefix}: invalid flightType '{query.FlightType}'.");
+                if (LooksLikeOptionList(query.FlightType))
+                {
+                    errors.Add($"{prefix}: invalid flightType '{query.FlightType}'. Expected a single value ('Arrival' or 'Departure'), not a pipe-separated options string.");
+                }
+                else
+                {
+                    errors.Add($"{prefix}: invalid flightType '{query.FlightType}'.");
+                }
                 continue;
             }
 
@@ -107,6 +116,17 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
             var normalizedOrigin = NormalizeCode(query.Origin);
             var normalizedDestination = NormalizeCode(query.Destination);
 
+            var directionError = ValidateDirectionInvariants(
+                flightType,
+                normalizedOrigin,
+                normalizedDestination);
+
+            if (directionError is not null)
+            {
+                errors.Add($"{prefix}: {directionError}");
+                continue;
+            }
+
             validatedQueries.Add(new AirportQuery(
                 Operation: operation,
                 FlightType: flightType,
@@ -117,7 +137,10 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
                 DateKeyword: dateKeyword));
         }
 
-        ValidateCriticalConstraints(question, validatedQueries, errors);
+        if (errors.Count == 0)
+        {
+            ValidateCriticalConstraints(question, validatedQueries, errors);
+        }
 
         if (errors.Count > 0)
         {
@@ -296,6 +319,50 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
     {
         return string.IsNullOrWhiteSpace(code)
             || _airportCodeRegex.IsMatch(code);
+    }
+
+    private static bool LooksLikeOptionList(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && value.Contains('|', StringComparison.Ordinal);
+    }
+
+    private static string? ValidateDirectionInvariants(
+        AirportFlightType? flightType,
+        string? origin,
+        string? destination)
+    {
+        if (!flightType.HasValue)
+            return null;
+
+        if (flightType == AirportFlightType.Arrival)
+        {
+            if (!string.IsNullOrWhiteSpace(destination)
+                && !string.Equals(destination, _primaryAirportCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return $"arrival flights require destination={_primaryAirportCode} when destination is specified; received destination={destination}.";
+            }
+
+            if (string.Equals(origin, _primaryAirportCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return $"arrival flights cannot use origin={_primaryAirportCode}; use destination={_primaryAirportCode} for arrivals at the primary airport.";
+            }
+
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(origin)
+            && !string.Equals(origin, _primaryAirportCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"departure flights require origin={_primaryAirportCode} when origin is specified; received origin={origin}.";
+        }
+
+        if (string.Equals(destination, _primaryAirportCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"departure flights cannot use destination={_primaryAirportCode}; use origin={_primaryAirportCode} for departures from the primary airport.";
+        }
+
+        return null;
     }
 
     private static string? NormalizeCode(string? value)
