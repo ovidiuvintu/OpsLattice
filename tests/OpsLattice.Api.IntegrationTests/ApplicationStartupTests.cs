@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using OpsLattice.Agents.Abstractions;
 using OpsLattice.Scenarios.Airport.Simulation;
 using Xunit;
 
@@ -53,6 +54,22 @@ public sealed class ApplicationStartupTests
             .GetRequiredService<AirportSimulationManager>();
 
         Assert.NotNull(manager);
+    }
+
+    [Fact]
+    public void DependencyInjection_ShouldResolveBothAirportAgents()
+    {
+        using var scope = _factory.Services.CreateScope();
+
+        var agents = scope.ServiceProvider
+            .GetRequiredService<IEnumerable<IAgent>>()
+            .ToArray();
+
+        Assert.Contains(agents, agent =>
+            string.Equals(agent.Name, "airport-operations", StringComparison.Ordinal));
+
+        Assert.Contains(agents, agent =>
+            string.Equals(agent.Name, "airport-operations-planned", StringComparison.Ordinal));
     }
 
     [Fact]

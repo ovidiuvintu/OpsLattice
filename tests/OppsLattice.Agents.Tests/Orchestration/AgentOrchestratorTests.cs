@@ -7,6 +7,86 @@ using Xunit;
 public sealed class AgentOrchestratorTests
 {
     [Fact]
+    public async Task ExecuteAsync_WhenAgenticAirportAgentSelected_UsesExactNameMatch()
+    {
+        var agentic = new Mock<IAgent>();
+        var planned = new Mock<IAgent>();
+
+        agentic.SetupGet(x => x.Name)
+            .Returns("airport-operations");
+
+        planned.SetupGet(x => x.Name)
+            .Returns("airport-operations-planned");
+
+        agentic.Setup(x => x.RunAsync(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentExecutionResult(
+                "id-agentic",
+                "agentic",
+                10,
+                Array.Empty<AgentLlmExecution>(),
+                Array.Empty<AgentToolExecution>()));
+
+        var orchestrator = new AgentOrchestrator(
+            [agentic.Object, planned.Object]);
+
+        var result = await orchestrator.ExecuteAsync(
+            "airport-operations",
+            "question");
+
+        Assert.Equal("agentic", result.Answer);
+
+        agentic.Verify(x => x.RunAsync(
+            "question",
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        planned.Verify(x => x.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenPlannedAirportAgentSelected_UsesExactNameMatch()
+    {
+        var agentic = new Mock<IAgent>();
+        var planned = new Mock<IAgent>();
+
+        agentic.SetupGet(x => x.Name)
+            .Returns("airport-operations");
+
+        planned.SetupGet(x => x.Name)
+            .Returns("airport-operations-planned");
+
+        planned.Setup(x => x.RunAsync(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentExecutionResult(
+                "id-planned",
+                "planned",
+                20,
+                Array.Empty<AgentLlmExecution>(),
+                Array.Empty<AgentToolExecution>()));
+
+        var orchestrator = new AgentOrchestrator(
+            [agentic.Object, planned.Object]);
+
+        var result = await orchestrator.ExecuteAsync(
+            "airport-operations-planned",
+            "question");
+
+        Assert.Equal("planned", result.Answer);
+
+        planned.Verify(x => x.RunAsync(
+            "question",
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        agentic.Verify(x => x.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WhenAgentExists_DelegatesExecution()
     {
         // Arrange

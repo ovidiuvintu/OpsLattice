@@ -3,6 +3,7 @@ using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Agents;
 using OpsLattice.Agents.Infrastructure;
 using OpsLattice.Agents.Orchestration;
+using OpsLattice.Agents.Planning;
 
 namespace OpsLattice.Api.Extensions;
 
@@ -38,11 +39,20 @@ public static class AgentServiceCollectionExtensions
                 });
 
         // Agents
+        services.AddScoped<IAirportQueryPlanner, AirportQueryPlanner>();
+        services.AddScoped<IAirportQueryValidator, AirportQueryValidator>();
+        services.AddScoped<IAirportQueryExecutor, AirportQueryExecutor>();
+        services.AddScoped<IAirportAnswerFormatter, AirportAnswerFormatter>();
+
         services.AddScoped<AirportOperationsAgent>();
+        services.AddScoped<AirportOperationsPlannedAgent>();
         services.AddScoped<GateAgent>();
 
         services.AddScoped<IAgent>(provider =>
             provider.GetRequiredService<AirportOperationsAgent>());
+
+        services.AddScoped<IAgent>(provider =>
+            provider.GetRequiredService<AirportOperationsPlannedAgent>());
 
         services.AddScoped<IAgent>(provider =>
             provider.GetRequiredService<GateAgent>());
