@@ -192,6 +192,49 @@ public sealed class AirportQueryExecutorTests
             () => executor.ExecuteAsync(plan));
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WhenListFlightsQueryProvided_ShouldCallSearchFlightsWithFilters()
+    {
+        var gateway = CreateGatewayWithTools(
+            CreateTool("search_flights", ["origin", "destination", "flightType", "date", "status"]));
+
+        IReadOnlyDictionary<string, object?>? capturedArgs = null;
+
+        gateway.Setup(x => x.CallToolAsync(
+                "search_flights",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IReadOnlyDictionary<string, object?>, CancellationToken>((_, args, _) => capturedArgs = args)
+            .ReturnsAsync(new AgentToolCallResult(true, "[]"));
+
+        var executor = new AirportQueryExecutor(gateway.Object);
+
+        var plan = new AirportQueryPlan(
+        [
+            new AirportQuery(
+                AirportQueryOperation.ListFlights,
+                AirportFlightType.Departure,
+                AirportFlightStatus.Delayed,
+                "IAH",
+                "ORD",
+                new DateOnly(2026, 10, 6),
+                null)
+        ]);
+
+        var result = await executor.ExecuteAsync(plan);
+
+        Assert.Single(result.Items);
+        Assert.True(result.Items[0].IsSuccess);
+        Assert.Equal("search_flights", result.Items[0].ToolName);
+
+        Assert.NotNull(capturedArgs);
+        Assert.Equal("IAH", capturedArgs!["origin"]);
+        Assert.Equal("ORD", capturedArgs["destination"]);
+        Assert.Equal("Departure", capturedArgs["flightType"]);
+        Assert.Equal("Delayed", capturedArgs["status"]);
+        Assert.Equal("2026-10-06", capturedArgs["date"]);
+    }
+
     private static Mock<IAgentToolGateway> CreateGatewayWithTools(
         params AgentTool[] tools)
     {

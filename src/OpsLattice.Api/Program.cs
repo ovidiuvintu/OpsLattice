@@ -149,7 +149,7 @@ app.MapPost(
         CancellationToken cancellationToken) =>
     {
         var agentName =
-            request.AgentName ?? "airport-operations";
+            request.AgentName ?? "airport-operations-planned";
 
         var result = await orchestrator.ExecuteAsync(
             agentName,

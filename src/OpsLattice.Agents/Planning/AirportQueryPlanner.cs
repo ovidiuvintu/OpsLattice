@@ -15,7 +15,7 @@ public sealed class AirportQueryPlanner(
             {
               "operation": "CountFlights|ListFlights|FlightSummary|GetSimulationTime",
               "flightType": "Arrival" | "Departure" | null,
-              "status": "Scheduled" | "Approaching" | "Landed" | "Departed" | null,
+              "status": "Scheduled" | "Approaching" | "Landed" | "AtGate" | "Boarding" | "ReadyForDeparture" | "Departed" | "Delayed" | "Cancelled" | null,
               "origin": "IATA code or null",
               "destination": "IATA code or null",
               "date": "yyyy-MM-dd|today|tomorrow|yesterday|null"
@@ -28,6 +28,14 @@ public sealed class AirportQueryPlanner(
         - Include every requested sub-query in the question.
         - Do not invent MCP tool names.
         - If a value is unknown, set it to null.
+        - "scheduled on/for <date>" refers to the scheduled date, not
+          operational status=Scheduled.
+        - Set status only when the user explicitly asks for current
+          operational state (for example, "currently have status Scheduled",
+          "how many have landed", "which flights are approaching").
+        - status works with both CountFlights and ListFlights.
+        - Use CountFlights for "how many" questions.
+        - Use ListFlights when the user asks to list, show or name flights.
         - For enum fields (operation, flightType, status), output ONE value only.
           Never output pipe-separated option strings like "Arrival|Departure".
         - For explicit dates, preserve the exact date in yyyy-MM-dd.
@@ -37,6 +45,14 @@ public sealed class AirportQueryPlanner(
           - A flight from IAH to LAX is a Departure.
           - For arrivals at the primary airport, prefer destination=IAH.
           - For departures from the primary airport, prefer origin=IAH.
+          - "Flights to DEN" (any airport other than IAH) are Departures
+            with destination=DEN. Never use flightType=Arrival with a
+            destination other than IAH.
+          - "Flights from LAX" (any airport other than IAH) are Arrivals
+            with origin=LAX.
+        - If the user asks how many AND asks to list or show details, return
+          both a CountFlights query and a ListFlights query with the same
+          filters, even when the listing is conditional ("if there are any").
 
         Example for a multi-part request:
         {

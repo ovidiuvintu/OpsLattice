@@ -86,6 +86,27 @@ public sealed class FlightToolsTests
     }
 
     [Fact]
+    public void GetFlightCount_WithArrivalsAtIahFromOrdOnOctober62026_ShouldReturnMatchingCount()
+    {
+        var (tools, queryService) = CreateSut();
+
+        var expected = queryService.GetFlights()
+            .Count(f =>
+                string.Equals(f.Type, nameof(FlightType.Arrival), StringComparison.Ordinal)
+                && string.Equals(f.Origin, "ORD", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(f.Destination, "IAH", StringComparison.OrdinalIgnoreCase)
+                && DateOnly.FromDateTime(f.ScheduledTime.UtcDateTime) == new DateOnly(2026, 10, 6));
+
+        var result = tools.GetFlightCount(
+            origin: "ORD",
+            destination: "IAH",
+            flightType: "Arrival",
+            date: "2026-10-06");
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
     public void GetFlightCount_WithDepartureFromLaxToIah_ShouldThrowDirectionalValidationError()
     {
         var (tools, _) = CreateSut();
@@ -113,6 +134,83 @@ public sealed class FlightToolsTests
                 date: "2026-10-06"));
 
         Assert.Contains("arrival flights", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GetFlightCount_WithStatus_ShouldCountOnlyMatchingStatus()
+    {
+        var (tools, queryService) = CreateSut();
+        var flights = queryService.GetFlights();
+
+        var expectedScheduled = flights.Count(f =>
+            string.Equals(f.Status, nameof(FlightStatus.Scheduled), StringComparison.Ordinal));
+
+        Assert.Equal(expectedScheduled, tools.GetFlightCount(status: "scheduled"));
+        Assert.Equal(0, tools.GetFlightCount(status: "Landed"));
+    }
+
+    [Fact]
+    public void GetFlightCount_WithInvalidStatus_ShouldThrowValidationError()
+    {
+        var (tools, _) = CreateSut();
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => tools.GetFlightCount(status: "OnTime"));
+
+        Assert.Contains("Approaching", exception.Message);
+        Assert.Contains("Omit status", exception.Message);
+    }
+
+    [Fact]
+    public void SearchFlights_WithRouteAndDate_ShouldReturnMatchingFlightDetailsInScheduleOrder()
+    {
+        var (tools, queryService) = CreateSut();
+
+        var departure = queryService.GetFlights()
+            .First(f => string.Equals(f.Type, nameof(FlightType.Departure), StringComparison.Ordinal));
+
+        var expected = queryService.GetFlights()
+            .Where(f =>
+                string.Equals(f.Type, nameof(FlightType.Departure), StringComparison.Ordinal)
+                && string.Equals(f.Destination, departure.Destination, StringComparison.OrdinalIgnoreCase)
+                && DateOnly.FromDateTime(f.ScheduledTime.UtcDateTime) == new DateOnly(2026, 10, 6))
+            .OrderBy(f => f.ScheduledTime)
+            .Select(f => f.FlightNumber)
+            .ToArray();
+
+        var result = tools.SearchFlights(
+            origin: departure.Origin,
+            destination: departure.Destination,
+            flightType: "Departure",
+            date: "2026-10-06");
+
+        Assert.Equal(expected, result.Select(f => f.FlightNumber).ToArray());
+        Assert.All(result, f =>
+        {
+            Assert.Equal(departure.Origin, f.Origin);
+            Assert.Equal(departure.Destination, f.Destination);
+            Assert.Equal(nameof(FlightType.Departure), f.Type);
+            Assert.False(string.IsNullOrWhiteSpace(f.Airline));
+        });
+    }
+
+    [Fact]
+    public void SearchFlights_WithNoFilters_ShouldReturnAllFlights()
+    {
+        var (tools, queryService) = CreateSut();
+
+        Assert.Equal(queryService.GetFlights().Count, tools.SearchFlights().Count);
+    }
+
+    [Fact]
+    public void SearchFlights_WithArrivalAndHomeAirportAsOrigin_ShouldThrowDirectionalValidationError()
+    {
+        var (tools, _) = CreateSut();
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => tools.SearchFlights(origin: "IAH", flightType: "Arrival"));
+
+        Assert.Contains("destination=IAH", exception.Message);
     }
 
     private static (FlightTools Tools, FlightQueryService QueryService) CreateSut()

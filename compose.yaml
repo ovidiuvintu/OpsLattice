@@ -9,6 +9,11 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Ollama__BaseUrl: http://host.docker.internal:11434
+      # Override with environment variables or a .env file next to this file,
+      # for example: OLLAMA_MODEL=qwen3.5:9b
+      Ollama__Model: ${OLLAMA_MODEL:-qwen2.5:7b-instruct-q4_K_M}
+      Ollama__ContextLength: ${OLLAMA_CONTEXT_LENGTH:-8192}
+      Ollama__Think: ${OLLAMA_THINK:-false}
       Mcp__BaseUrl: http://localhost:8080/mcp
     extra_hosts:
       - "host.docker.internal:host-gateway"

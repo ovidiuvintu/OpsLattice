@@ -22,12 +22,36 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
         "\\b\\d{4}-\\d{2}-\\d{2}\\b",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    // Accepts "October 6, 2026", "October 6 2026" and "October 6th, 2026".
     private static readonly Regex _fullMonthDayYearRegex = new(
-        "\\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{1,2},\\s+\\d{4}\\b",
+        "\\b(?<month>January|February|March|April|May|June|July|August|September|October|November|December)\\s+(?<day>\\d{1,2})(?:st|nd|rd|th)?,?\\s+(?<year>\\d{4})\\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex _monthDayWithoutYearRegex = new(
-        "\\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{1,2}(?!,\\s*\\d{4})\\b",
+        "\\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{1,2}(?:st|nd|rd|th)?\\b(?!,?\\s*\\d{4})",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    // Words that unambiguously ask about a flight's operational status.
+    // "scheduled" is excluded because "scheduled on <date>" is date intent.
+    private static readonly Regex _statusIntentRegex = new(
+        "\\b(?:landed|approaching|departed|delayed|cancell?ed|boarding|at (?:the )?gate|(?:have|has|with) (?:a |the )?status)\\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex _arrivalWordRegex = new(
+        "\\barriv\\w*",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex _departureWordRegex = new(
+        "\\bdepart\\w*",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex _scheduledForDateRegex = new(
+        "\\bscheduled\\s+(?:on|for)\\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    // Explicit requests for the Scheduled operational status.
+    private static readonly Regex _scheduledStatusRegex = new(
+        "\\b(?:status\\s+(?:of\\s+)?scheduled|currently\\s+scheduled|still\\s+scheduled)\\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public Task<AirportQueryValidationResult> ValidateAsync(
@@ -116,6 +140,18 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
             var normalizedOrigin = NormalizeCode(query.Origin);
             var normalizedDestination = NormalizeCode(query.Destination);
 
+            flightType = AlignFlightTypeWithRoute(
+                question,
+                flightType,
+                normalizedOrigin,
+                normalizedDestination);
+
+            (normalizedOrigin, normalizedDestination) = AnchorRouteToPrimaryAirport(
+                question,
+                flightType,
+                normalizedOrigin,
+                normalizedDestination);
+
             var directionError = ValidateDirectionInvariants(
                 flightType,
                 normalizedOrigin,
@@ -201,6 +237,19 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
             errors.Add("Plan does not preserve the multi-part arrivals/departures request.");
         }
 
+        if (_statusIntentRegex.IsMatch(question) &&
+            !queries.Any(q => q.Status.HasValue))
+        {
+            errors.Add("Plan does not preserve the requested status filter. Set status on the query instead of dropping it.");
+        }
+
+        if (_scheduledForDateRegex.IsMatch(question) &&
+            !_scheduledStatusRegex.IsMatch(question) &&
+            queries.Any(q => q.Status == AirportFlightStatus.Scheduled))
+        {
+            errors.Add("\"scheduled on/for <date>\" refers to the scheduled date, not status=Scheduled. Remove status and keep the date.");
+        }
+
         var explicitDate = ExtractExplicitDate(question);
         if (explicitDate.HasValue && !queries.Any(q => q.Date == explicitDate.Value))
         {
@@ -224,10 +273,11 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
 
         var monthDateYearMatch = _fullMonthDayYearRegex.Match(question);
         if (monthDateYearMatch.Success &&
-            DateOnly.TryParse(
-                monthDateYearMatch.Value,
+            DateOnly.TryParseExact(
+                $"{monthDateYearMatch.Groups["month"].Value} {monthDateYearMatch.Groups["day"].Value} {monthDateYearMatch.Groups["year"].Value}",
+                "MMMM d yyyy",
                 CultureInfo.InvariantCulture,
-                DateTimeStyles.AllowWhiteSpaces,
+                DateTimeStyles.None,
                 out var fullDate))
         {
             return fullDate;
@@ -361,6 +411,85 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
         {
             return $"departure flights cannot use destination={_primaryAirportCode}; use origin={_primaryAirportCode} for departures from the primary airport.";
         }
+
+        return null;
+    }
+
+    // Every flight in the simulation touches the primary airport, so the route
+    // already says which way it goes: "to DEN" is a departure and "from LAX" is
+    // an arrival. Small models often get flightType backwards, so the route wins
+    // unless the user explicitly asked for the direction the model chose.
+    private static AirportFlightType? AlignFlightTypeWithRoute(
+        string question,
+        AirportFlightType? flightType,
+        string? origin,
+        string? destination)
+    {
+        var impliedType = GetFlightTypeImpliedByRoute(origin, destination);
+
+        if (impliedType is null || flightType == impliedType)
+            return flightType;
+
+        if (flightType is null)
+            return impliedType;
+
+        var explicitlyRequested = flightType == AirportFlightType.Arrival
+            ? _arrivalWordRegex.IsMatch(question)
+            : _departureWordRegex.IsMatch(question);
+
+        return explicitlyRequested ? flightType : impliedType;
+    }
+
+    // In multi-part questions ("arriving from LAX and departing to ORD") models
+    // often leak one part's airport into the other query, producing an arrival
+    // from LAX to ORD. When the user explicitly asked for arrivals (or
+    // departures), the far end must be the primary airport, so fix it here
+    // instead of spending a repair round-trip on it.
+    private static (string? Origin, string? Destination) AnchorRouteToPrimaryAirport(
+        string question,
+        AirportFlightType? flightType,
+        string? origin,
+        string? destination)
+    {
+        if (!IsOtherAirport(origin) || !IsOtherAirport(destination))
+            return (origin, destination);
+
+        if (flightType == AirportFlightType.Arrival &&
+            _arrivalWordRegex.IsMatch(question))
+        {
+            return (origin, _primaryAirportCode);
+        }
+
+        if (flightType == AirportFlightType.Departure &&
+            _departureWordRegex.IsMatch(question))
+        {
+            return (_primaryAirportCode, destination);
+        }
+
+        return (origin, destination);
+    }
+
+    private static bool IsOtherAirport(string? code)
+    {
+        return !string.IsNullOrWhiteSpace(code)
+            && !string.Equals(code, _primaryAirportCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static AirportFlightType? GetFlightTypeImpliedByRoute(
+        string? origin,
+        string? destination)
+    {
+        var fromOtherAirport = !string.IsNullOrWhiteSpace(origin)
+            && !string.Equals(origin, _primaryAirportCode, StringComparison.OrdinalIgnoreCase);
+
+        var toOtherAirport = !string.IsNullOrWhiteSpace(destination)
+            && !string.Equals(destination, _primaryAirportCode, StringComparison.OrdinalIgnoreCase);
+
+        if (toOtherAirport && !fromOtherAirport)
+            return AirportFlightType.Departure;
+
+        if (fromOtherAirport && !toOtherAirport)
+            return AirportFlightType.Arrival;
 
         return null;
     }

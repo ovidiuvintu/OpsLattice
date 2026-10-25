@@ -35,6 +35,40 @@ public sealed class FlightTools(
             "flightType must be 'Arrival' or 'Departure'. Omit flightType to include all flight types.");
     }
 
+    private static string? ValidateStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return null;
+
+        if (Enum.TryParse<FlightStatus>(status.Trim(), ignoreCase: true, out var value)
+            && Enum.IsDefined(value))
+        {
+            return value.ToString();
+        }
+
+        throw new ArgumentException(
+            $"status must be one of: {string.Join(", ", Enum.GetNames<FlightStatus>())}. Omit status to include all statuses.");
+    }
+
+    private static DateOnly? ParseDate(string? date)
+    {
+        if (string.IsNullOrWhiteSpace(date))
+            return null;
+
+        if (!DateOnly.TryParseExact(
+                date,
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var value))
+        {
+            throw new ArgumentException(
+                "Date must be in YYYY-MM-DD format.");
+        }
+
+        return value;
+    }
+
     private static string? ResolvePrimaryAirportCode(
         IReadOnlyCollection<FlightSnapshot> flights)
     {
@@ -125,49 +159,75 @@ public sealed class FlightTools(
     [Description("""
         Counts flights matching explicitly requested filters.
 
-        Only include the status parameter when the user explicitly
-        specifies an operational status, such as Scheduled,
-        Approaching, Landed, or Departed.
+        Supported filters are: origin, destination, flightType, date,
+        and status. Omit any filter the user did not ask for.
 
-        A flight's scheduled date does not imply status=Scheduled.
-
-        Omit status when the user requests all flights regardless
-        of their current operational state.
+        status is the flight's current operational state (for example
+        Scheduled, Approaching, Landed, AtGate, Departed). A flight's
+        scheduled date does not imply status=Scheduled.
         """)]
     public int GetFlightCount(
     string? origin = null,
     string? destination = null,
     string? flightType = null,
-    string? date = null)
+    string? date = null,
+    string? status = null)
     {
         var validatedFlightType = ValidateFlightType(flightType);
+        var validatedStatus = ValidateStatus(status);
         ValidateDirectionalAirportUsage(
             origin,
             destination,
             validatedFlightType);
 
-        DateOnly? parsedDate = null;
-
-        if (!string.IsNullOrWhiteSpace(date))
-        {
-            if (!DateOnly.TryParseExact(
-                    date,
-                    "yyyy-MM-dd",
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None,
-                    out var value))
-            {
-                throw new ArgumentException(
-                    "Date must be in YYYY-MM-DD format.");
-            }
-
-            parsedDate = value;
-        }
-
         return flightQueryService.CountFlights(
             origin,
             destination,
             validatedFlightType,
-            parsedDate);
+            ParseDate(date),
+            validatedStatus);
+    }
+
+    [McpServerTool(Name = "search_flights", ReadOnly = true)]
+    [Description("""
+        Lists flights matching explicitly requested filters, ordered by
+        scheduled time. Each result includes flight number, airline,
+        type, origin, destination, scheduled time (UTC), status and gate.
+
+        Supported filters are: origin, destination, flightType, date,
+        and status. Omit any filter the user did not ask for.
+
+        Use get_flight_count instead when only a count is needed.
+        """)]
+    public IReadOnlyCollection<FlightDetailsDto> SearchFlights(
+    string? origin = null,
+    string? destination = null,
+    string? flightType = null,
+    string? date = null,
+    string? status = null)
+    {
+        var validatedFlightType = ValidateFlightType(flightType);
+        var validatedStatus = ValidateStatus(status);
+        ValidateDirectionalAirportUsage(
+            origin,
+            destination,
+            validatedFlightType);
+
+        return flightQueryService.SearchFlights(
+                origin,
+                destination,
+                validatedFlightType,
+                ParseDate(date),
+                validatedStatus)
+            .Select(f => new FlightDetailsDto(
+                f.FlightNumber,
+                f.Airline,
+                f.Type,
+                f.Origin,
+                f.Destination,
+                f.ScheduledTime,
+                f.Status,
+                f.Gate ?? f.OccupiedGate))
+            .ToArray();
     }
 }

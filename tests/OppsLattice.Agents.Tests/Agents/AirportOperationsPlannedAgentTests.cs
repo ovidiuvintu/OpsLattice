@@ -203,4 +203,46 @@ public sealed class AirportOperationsPlannedAgentTests
                 It.IsAny<CancellationToken>()),
             Times.Exactly(2));
     }
+
+    [Fact]
+    public async Task RunAsync_WhenValidationFailsForCountFlightsStatus_ShouldIncludeRepairGuidanceInSecondPlannerPrompt()
+    {
+        var planner = new Mock<IAirportQueryPlanner>();
+        var validator = new Mock<IAirportQueryValidator>();
+        var executor = new Mock<IAirportQueryExecutor>();
+        var formatter = new Mock<IAirportAnswerFormatter>();
+
+        var invalidDraft = new AirportQueryPlanDraft(
+        [
+            new AirportQueryDraft("CountFlights", "Arrival", "Scheduled", null, "IAH", "2026-10-06")
+        ]);
+
+        planner.SetupSequence(x => x.BuildPlanAsync(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AirportPlannerOutput(invalidDraft, null, "{invalid}"))
+            .ReturnsAsync(new AirportPlannerOutput(null, "malformed", "not-json"));
+
+        validator.Setup(x => x.ValidateAsync(
+                It.IsAny<string>(),
+                It.IsAny<AirportQueryPlanDraft>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AirportQueryValidationResult.Invalid(
+                ["Query 1: CountFlights does not support status filtering with current MCP tools."]));
+
+        var agent = new AirportOperationsPlannedAgent(
+            planner.Object,
+            validator.Object,
+            executor.Object,
+            formatter.Object);
+
+        var _ = await agent.RunAsync("How many flights are scheduled to arrive at IAH on October 6, 2026?");
+
+        planner.Verify(x => x.BuildPlanAsync(
+                It.Is<string>(prompt =>
+                    prompt.Contains("Never drop a filter just to make the plan pass.", StringComparison.Ordinal) &&
+                    prompt.Contains("scheduled on/for <date>", StringComparison.Ordinal)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }

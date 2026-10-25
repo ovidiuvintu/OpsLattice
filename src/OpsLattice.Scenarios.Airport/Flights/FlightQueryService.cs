@@ -26,20 +26,23 @@ public sealed class FlightQueryService(
         string? origin = null,
         string? destination = null,
         string? flightType = null,
-        DateOnly? date = null)
+        DateOnly? date = null,
+        string? status = null)
     {
         return SearchFlights(
             origin,
             destination,
             flightType,
-            date).Count;
+            date,
+            status).Count;
     }
 
     public IReadOnlyCollection<FlightSnapshot> SearchFlights(
         string? origin = null,
         string? destination = null,
         string? flightType = null,
-        DateOnly? date = null)
+        DateOnly? date = null,
+        string? status = null)
     {
         IEnumerable<FlightSnapshot> flights = manager.GetFlights();
 
@@ -69,7 +72,16 @@ public sealed class FlightQueryService(
                 DateOnly.FromDateTime(f.ScheduledTime.UtcDateTime)
                     == date.Value);
 
-        return flights.ToArray();
+        if (!string.IsNullOrWhiteSpace(status))
+            flights = flights.Where(f =>
+                string.Equals(
+                    f.Status,
+                    status,
+                    StringComparison.OrdinalIgnoreCase));
+
+        return flights
+            .OrderBy(f => f.ScheduledTime)
+            .ToArray();
     }
 
 }

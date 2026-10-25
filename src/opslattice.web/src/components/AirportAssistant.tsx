@@ -58,7 +58,7 @@ const codeStyle: React.CSSProperties = {
 
 export default function AirportAssistant() {
   const [agentName, setAgentName] =
-    useState<AgentName>("airport-operations");
+    useState<AgentName>("airport-operations-planned");
 
   const [question, setQuestion] = useState("");
   const [result, setResult] =
@@ -158,11 +158,11 @@ export default function AirportAssistant() {
               minWidth: "220px",
             }}
           >
-            <option value="airport-operations">
-              Airport Operations (Agentic)
-            </option>
             <option value="airport-operations-planned">
               Airport Operations (Planned)
+            </option>
+            <option value="airport-operations">
+              Airport Operations (Experimental)
             </option>
             <option value="gate">
               Gate Operations

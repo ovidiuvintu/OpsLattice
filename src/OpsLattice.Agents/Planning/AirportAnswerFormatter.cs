@@ -5,6 +5,8 @@ namespace OpsLattice.Agents.Planning;
 
 public sealed class AirportAnswerFormatter : IAirportAnswerFormatter
 {
+    private const int _maxListedFlights = 25;
+
     public string Format(
         string question,
         AirportQueryExecutionResult executionResult)
@@ -78,19 +80,50 @@ public sealed class AirportAnswerFormatter : IAirportAnswerFormatter
                 : $"No flights matched ({scope}).";
         }
 
-        var preview = flights.Take(5)
-            .Select(flight =>
-            {
-                var number = ReadCaseInsensitiveString(flight, "flightNumber") ?? "unknown";
-                var status = ReadCaseInsensitiveString(flight, "status") ?? "unknown";
-                return $"{number} ({status})";
-            });
+        var lines = flights.Take(_maxListedFlights)
+            .Select(FormatFlightLine);
 
-        var suffix = flights.Length > 5 ? " (showing first 5)" : string.Empty;
+        var suffix = flights.Length > _maxListedFlights
+            ? $" (showing first {_maxListedFlights})"
+            : string.Empty;
 
-        return scope.Length == 0
-            ? $"Flights matched: {flights.Length}{suffix}: {string.Join(", ", preview)}."
-            : $"Flights matched ({scope}): {flights.Length}{suffix}: {string.Join(", ", preview)}.";
+        var header = scope.Length == 0
+            ? $"Flights matched: {flights.Length}{suffix}:"
+            : $"Flights matched ({scope}): {flights.Length}{suffix}:";
+
+        return header + Environment.NewLine + string.Join(Environment.NewLine, lines);
+    }
+
+    private static string FormatFlightLine(JsonElement flight)
+    {
+        var number = ReadCaseInsensitiveString(flight, "flightNumber") ?? "unknown";
+        var status = ReadCaseInsensitiveString(flight, "status") ?? "unknown";
+        var origin = ReadCaseInsensitiveString(flight, "origin");
+        var destination = ReadCaseInsensitiveString(flight, "destination");
+        var scheduled = ReadCaseInsensitiveString(flight, "scheduledTime");
+        var gate = ReadCaseInsensitiveString(flight, "gate");
+
+        var parts = new List<string> { number };
+
+        if (origin is not null && destination is not null)
+            parts.Add($"{origin}->{destination}");
+
+        if (scheduled is not null &&
+            DateTimeOffset.TryParse(
+                scheduled,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out var scheduledTime))
+        {
+            parts.Add($"{scheduledTime.UtcDateTime:yyyy-MM-dd HH:mm} UTC");
+        }
+
+        parts.Add(status);
+
+        if (!string.IsNullOrWhiteSpace(gate) && gate != "null")
+            parts.Add($"gate {gate}");
+
+        return "- " + string.Join(", ", parts);
     }
 
     private static string FormatSummary(AirportQueryExecutionItem item)
