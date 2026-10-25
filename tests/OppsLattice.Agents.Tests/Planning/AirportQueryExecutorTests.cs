@@ -193,6 +193,84 @@ public sealed class AirportQueryExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WhenCountSchemaIncludesStatus_ShouldPassExplicitStatusAndAcceptZero()
+    {
+        var gateway = CreateGatewayWithTools(CreateLiveFlightCountTool());
+
+        IReadOnlyDictionary<string, object?>? capturedArgs = null;
+
+        gateway.Setup(x => x.CallToolAsync(
+                "get_flight_count",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IReadOnlyDictionary<string, object?>, CancellationToken>((_, args, _) => capturedArgs = args)
+            .ReturnsAsync(new AgentToolCallResult(true, "0"));
+
+        var executor = new AirportQueryExecutor(gateway.Object);
+
+        var plan = new AirportQueryPlan(
+        [
+            new AirportQuery(
+                AirportQueryOperation.CountFlights,
+                AirportFlightType.Arrival,
+                AirportFlightStatus.Scheduled,
+                null,
+                "IAH",
+                new DateOnly(2026, 10, 6),
+                null)
+        ]);
+
+        var result = await executor.ExecuteAsync(plan);
+
+        Assert.Single(result.Items);
+        Assert.True(result.Items[0].IsSuccess);
+        Assert.Equal("0", result.Items[0].Result);
+        Assert.NotNull(capturedArgs);
+        Assert.Equal("Scheduled", capturedArgs!["status"]);
+        Assert.Equal("Arrival", capturedArgs["flightType"]);
+        Assert.Equal("IAH", capturedArgs["destination"]);
+        Assert.Equal("2026-10-06", capturedArgs["date"]);
+        Assert.False(capturedArgs.ContainsKey("origin"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenScheduleDateQueryHasNoStatus_ShouldOmitStatusArgument()
+    {
+        var gateway = CreateGatewayWithTools(CreateLiveFlightCountTool());
+
+        IReadOnlyDictionary<string, object?>? capturedArgs = null;
+
+        gateway.Setup(x => x.CallToolAsync(
+                "get_flight_count",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IReadOnlyDictionary<string, object?>, CancellationToken>((_, args, _) => capturedArgs = args)
+            .ReturnsAsync(new AgentToolCallResult(true, "100"));
+
+        var executor = new AirportQueryExecutor(gateway.Object);
+
+        var plan = new AirportQueryPlan(
+        [
+            new AirportQuery(
+                AirportQueryOperation.CountFlights,
+                null,
+                null,
+                null,
+                "IAH",
+                new DateOnly(2026, 10, 6),
+                null)
+        ]);
+
+        var result = await executor.ExecuteAsync(plan);
+
+        Assert.True(result.Items[0].IsSuccess);
+        Assert.NotNull(capturedArgs);
+        Assert.False(capturedArgs!.ContainsKey("status"));
+        Assert.Equal("IAH", capturedArgs["destination"]);
+        Assert.Equal("2026-10-06", capturedArgs["date"]);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WhenListFlightsQueryProvided_ShouldCallSearchFlightsWithFilters()
     {
         var gateway = CreateGatewayWithTools(
@@ -263,5 +341,26 @@ public sealed class AirportQueryExecutorTests
         });
 
         return new AgentTool(name, name, schema);
+    }
+
+    private static AgentTool CreateLiveFlightCountTool()
+    {
+        const string schemaJson = """
+            {
+              "type": "object",
+              "properties": {
+                "origin": { "type": ["string", "null"], "default": null },
+                "destination": { "type": ["string", "null"], "default": null },
+                "flightType": { "type": ["string", "null"], "default": null },
+                "date": { "type": ["string", "null"], "default": null },
+                "status": { "type": ["string", "null"], "default": null }
+              }
+            }
+            """;
+
+        return new AgentTool(
+            "get_flight_count",
+            "get_flight_count",
+            JsonSerializer.Deserialize<JsonElement>(schemaJson));
     }
 }

@@ -407,6 +407,78 @@ public sealed class AirportQueryValidatorTests
     }
 
     [Fact]
+    public async Task ValidateAsync_WhenScheduledAtAirportOnDateBecomesStatusScheduled_ShouldReturnInvalid()
+    {
+        var draft = new AirportQueryPlanDraft(
+        [
+            new AirportQueryDraft(
+                Operation: "CountFlights",
+                FlightType: null,
+                Status: "Scheduled",
+                Origin: null,
+                Destination: "IAH",
+                Date: "2026-10-06")
+        ]);
+
+        var result = await _validator.ValidateAsync(
+            "How many flights are scheduled at IAH on October 6, 2026?",
+            draft);
+
+        Assert.False(result.IsValid);
+        Assert.Null(result.Plan);
+        Assert.Contains(result.Errors, e =>
+            e.Contains("not status=Scheduled", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenScheduledAtAirportOnDateOmitsStatus_ShouldPassWithDateOnly()
+    {
+        var draft = new AirportQueryPlanDraft(
+        [
+            new AirportQueryDraft(
+                Operation: "CountFlights",
+                FlightType: null,
+                Status: null,
+                Origin: null,
+                Destination: "IAH",
+                Date: "2026-10-06")
+        ]);
+
+        var result = await _validator.ValidateAsync(
+            "How many flights are scheduled at IAH on October 6, 2026?",
+            draft);
+
+        Assert.True(result.IsValid);
+        Assert.Null(result.Plan!.Queries[0].Status);
+        Assert.Equal(new DateOnly(2026, 10, 6), result.Plan.Queries[0].Date);
+        Assert.Equal("IAH", result.Plan.Queries[0].Destination);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenDepartureDirectionIsPreserved_ShouldPass()
+    {
+        var draft = new AirportQueryPlanDraft(
+        [
+            new AirportQueryDraft(
+                Operation: "CountFlights",
+                FlightType: "Departure",
+                Status: null,
+                Origin: "IAH",
+                Destination: "ORD",
+                Date: "2026-10-06")
+        ]);
+
+        var result = await _validator.ValidateAsync(
+            "How many departures from IAH to ORD on October 6, 2026?",
+            draft);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(AirportFlightType.Departure, result.Plan!.Queries[0].FlightType);
+        Assert.Equal("IAH", result.Plan.Queries[0].Origin);
+        Assert.Equal("ORD", result.Plan.Queries[0].Destination);
+    }
+
+    [Fact]
     public async Task ValidateAsync_WhenOptionalOriginDestinationAreOmitted_ShouldRemainValid()
     {
         var draft = new AirportQueryPlanDraft(
@@ -425,5 +497,129 @@ public sealed class AirportQueryValidatorTests
             draft);
 
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenDepartingOtherAirportAndArrivingAtPrimary_ShouldCountOneArrival()
+    {
+        var draft = new AirportQueryPlanDraft(
+        [
+            new AirportQueryDraft(
+                Operation: "CountFlights",
+                FlightType: "Departure",
+                Status: null,
+                Origin: "LAX",
+                Destination: "IAH",
+                Date: "today")
+        ]);
+
+        var result = await _validator.ValidateAsync(
+            "How many flights are departing LAX and arriving at IAH today?",
+            draft);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(AirportFlightType.Arrival, result.Plan!.Queries[0].FlightType);
+        Assert.Equal("LAX", result.Plan.Queries[0].Origin);
+        Assert.Equal("IAH", result.Plan.Queries[0].Destination);
+        Assert.Equal("today", result.Plan.Queries[0].DateKeyword);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenPlanDropsNamedOrigin_ShouldStayInvalid()
+    {
+        var draft = new AirportQueryPlanDraft(
+        [
+            new AirportQueryDraft(
+                Operation: "CountFlights",
+                FlightType: "Arrival",
+                Status: null,
+                Origin: null,
+                Destination: "IAH",
+                Date: "today")
+        ]);
+
+        var result = await _validator.ValidateAsync(
+            "How many flights are departing LAX and arriving at IAH today?",
+            draft);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e =>
+            e.Contains("origin LAX", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenArrivalUsesPrimaryAsBothEnds_ShouldRefuseWithoutAPlan()
+    {
+        var draft = new AirportQueryPlanDraft(
+        [
+            new AirportQueryDraft(
+                Operation: "CountFlights",
+                FlightType: "Arrival",
+                Status: null,
+                Origin: "IAH",
+                Destination: "IAH",
+                Date: "2026-10-06")
+        ]);
+
+        var result = await _validator.ValidateAsync(
+            "How many flights are arriving at IAH from IAH on October 6, 2026?",
+            draft);
+
+        Assert.True(result.RequiresClarification);
+        Assert.False(result.IsValid);
+        Assert.Null(result.Plan);
+        Assert.Contains("contradict", result.Clarification, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenWidenedPlanDropsContradictoryOrigin_ShouldStillRefuse()
+    {
+        var draft = new AirportQueryPlanDraft(
+        [
+            new AirportQueryDraft(
+                Operation: "CountFlights",
+                FlightType: "Arrival",
+                Status: null,
+                Origin: null,
+                Destination: "IAH",
+                Date: "2026-10-06")
+        ]);
+
+        var result = await _validator.ValidateAsync(
+            "How many flights are arriving at IAH from IAH on October 6, 2026?",
+            draft);
+
+        Assert.True(result.RequiresClarification);
+        Assert.Null(result.Plan);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenDeparturesFromPrimaryAndArrivalsAtPrimary_ShouldRemainValid()
+    {
+        var draft = new AirportQueryPlanDraft(
+        [
+            new AirportQueryDraft(
+                Operation: "CountFlights",
+                FlightType: "Departure",
+                Status: null,
+                Origin: "IAH",
+                Destination: null,
+                Date: "2026-10-06"),
+            new AirportQueryDraft(
+                Operation: "CountFlights",
+                FlightType: "Arrival",
+                Status: null,
+                Origin: null,
+                Destination: "IAH",
+                Date: "2026-10-06")
+        ]);
+
+        var result = await _validator.ValidateAsync(
+            "How many flights are departing from IAH and arriving at IAH on October 6, 2026?",
+            draft);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(AirportFlightType.Departure, result.Plan!.Queries[0].FlightType);
+        Assert.Equal(AirportFlightType.Arrival, result.Plan.Queries[1].FlightType);
     }
 }

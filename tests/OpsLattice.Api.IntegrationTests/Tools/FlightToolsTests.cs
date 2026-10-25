@@ -1,3 +1,4 @@
+using ModelContextProtocol;
 using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Setup;
 using OpsLattice.Scenarios.Airport.Simulation;
@@ -12,7 +13,7 @@ public sealed class FlightToolsTests
     {
         var (tools, _) = CreateSut();
 
-        var exception = Assert.Throws<ArgumentException>(
+        var exception = Assert.Throws<McpException>(
             () => tools.GetFlightCount(flightType: "All"));
 
         Assert.Contains("Arrival", exception.Message);
@@ -57,7 +58,7 @@ public sealed class FlightToolsTests
     {
         var (tools, _) = CreateSut();
 
-        var exception = Assert.Throws<ArgumentException>(
+        var exception = Assert.Throws<McpException>(
             () => tools.GetFlightCount(
                 origin: "IAH",
                 flightType: "Arrival",
@@ -111,7 +112,7 @@ public sealed class FlightToolsTests
     {
         var (tools, _) = CreateSut();
 
-        var exception = Assert.Throws<ArgumentException>(
+        var exception = Assert.Throws<McpException>(
             () => tools.GetFlightCount(
                 origin: "LAX",
                 destination: "IAH",
@@ -126,7 +127,7 @@ public sealed class FlightToolsTests
     {
         var (tools, _) = CreateSut();
 
-        var exception = Assert.Throws<ArgumentException>(
+        var exception = Assert.Throws<McpException>(
             () => tools.GetFlightCount(
                 origin: "IAH",
                 destination: "LAX",
@@ -147,6 +148,7 @@ public sealed class FlightToolsTests
 
         Assert.Equal(expectedScheduled, tools.GetFlightCount(status: "scheduled"));
         Assert.Equal(0, tools.GetFlightCount(status: "Landed"));
+        Assert.Equal(0, tools.GetFlightCount(date: "2026-10-07"));
     }
 
     [Fact]
@@ -154,7 +156,7 @@ public sealed class FlightToolsTests
     {
         var (tools, _) = CreateSut();
 
-        var exception = Assert.Throws<ArgumentException>(
+        var exception = Assert.Throws<McpException>(
             () => tools.GetFlightCount(status: "OnTime"));
 
         Assert.Contains("Approaching", exception.Message);
@@ -207,7 +209,7 @@ public sealed class FlightToolsTests
     {
         var (tools, _) = CreateSut();
 
-        var exception = Assert.Throws<ArgumentException>(
+        var exception = Assert.Throws<McpException>(
             () => tools.SearchFlights(origin: "IAH", flightType: "Arrival"));
 
         Assert.Contains("destination=IAH", exception.Message);

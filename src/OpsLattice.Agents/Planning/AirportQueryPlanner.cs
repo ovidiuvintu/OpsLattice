@@ -28,8 +28,9 @@ public sealed class AirportQueryPlanner(
         - Include every requested sub-query in the question.
         - Do not invent MCP tool names.
         - If a value is unknown, set it to null.
-        - "scheduled on/for <date>" refers to the scheduled date, not
-          operational status=Scheduled.
+        - "scheduled on/for/at <date>" and "scheduled at <airport> on <date>"
+          refer to the scheduled date, not operational status=Scheduled.
+          Leave status null for those questions.
         - Set status only when the user explicitly asks for current
           operational state (for example, "currently have status Scheduled",
           "how many have landed", "which flights are approaching").
@@ -50,6 +51,11 @@ public sealed class AirportQueryPlanner(
             destination other than IAH.
           - "Flights from LAX" (any airport other than IAH) are Arrivals
             with origin=LAX.
+          - "Departing LAX and arriving at IAH" is one Arrival with
+            origin=LAX and destination=IAH, not a Departure.
+          - Never use the same airport as both origin and destination.
+            An arrival from IAH to IAH is contradictory. Do not drop
+            an airport to force a count.
         - If the user asks how many AND asks to list or show details, return
           both a CountFlights query and a ListFlights query with the same
           filters, even when the listing is conditional ("if there are any").

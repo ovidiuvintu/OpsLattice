@@ -45,8 +45,16 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
         "\\bdepart\\w*",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    private static readonly Regex _scheduledWordRegex = new(
+        "\\bscheduled\\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static readonly Regex _scheduledForDateRegex = new(
-        "\\bscheduled\\s+(?:on|for)\\b",
+        "\\bscheduled\\s+(?:on|for|at)\\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex _relativeDateWordRegex = new(
+        "\\b(?:today|tomorrow|yesterday)\\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     // Explicit requests for the Scheduled operational status.
@@ -66,6 +74,14 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
             return Task.FromResult(
                 AirportQueryValidationResult.Invalid(
                     ["Plan must contain at least one query."]));
+        }
+
+        var contradictoryRoute = TryBuildContradictoryRouteRefusal(question);
+        if (contradictoryRoute is not null)
+        {
+            return Task.FromResult(
+                AirportQueryValidationResult.ClarificationNeeded(
+                    contradictoryRoute));
         }
 
         var missingYearClarification = TryBuildMissingYearClarification(question);
@@ -139,6 +155,15 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
 
             var normalizedOrigin = NormalizeCode(query.Origin);
             var normalizedDestination = NormalizeCode(query.Destination);
+
+            if (normalizedOrigin is not null &&
+                normalizedDestination is not null &&
+                string.Equals(normalizedOrigin, normalizedDestination, StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(
+                    AirportQueryValidationResult.ClarificationNeeded(
+                        $"A flight cannot use {normalizedOrigin} as both origin and destination. That route contradicts itself, so there is no count to return."));
+            }
 
             flightType = AlignFlightTypeWithRoute(
                 question,
@@ -237,24 +262,159 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
             errors.Add("Plan does not preserve the multi-part arrivals/departures request.");
         }
 
-        if (_statusIntentRegex.IsMatch(question) &&
+        if (AsksForOperationalStatus(question) &&
             !queries.Any(q => q.Status.HasValue))
         {
             errors.Add("Plan does not preserve the requested status filter. Set status on the query instead of dropping it.");
         }
 
-        if (_scheduledForDateRegex.IsMatch(question) &&
-            !_scheduledStatusRegex.IsMatch(question) &&
+        if (!AsksForOperationalStatus(question) &&
+            queries.Any(q => q.Status.HasValue))
+        {
+            errors.Add("Plan added a status filter the user did not request. Remove status. Do not infer operational status from schedule wording.");
+        }
+
+        if (AsksForScheduleDate(question) &&
             queries.Any(q => q.Status == AirportFlightStatus.Scheduled))
         {
-            errors.Add("\"scheduled on/for <date>\" refers to the scheduled date, not status=Scheduled. Remove status and keep the date.");
+            errors.Add("\"scheduled\" with a date refers to the scheduled date, not status=Scheduled. Remove status and keep the date.");
         }
+
+        RequireStatedAirports(question, queries, errors);
 
         var explicitDate = ExtractExplicitDate(question);
         if (explicitDate.HasValue && !queries.Any(q => q.Date == explicitDate.Value))
         {
             errors.Add("Plan does not preserve the explicit date requested by the user.");
         }
+    }
+
+    private static string? TryBuildContradictoryRouteRefusal(string question)
+    {
+        var clauses = Regex.Split(
+            question,
+            @"\band\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        foreach (var clause in clauses)
+        {
+            var fromCode = ReadAirportCode(clause, @"\bfrom\s+([A-Za-z]{3})\b");
+            var toCode = ReadAirportCode(clause, @"\bto\s+([A-Za-z]{3})\b");
+            var arrivingAt = ReadAirportCode(clause, @"\barriv\w*\s+at\s+([A-Za-z]{3})\b");
+
+            if (fromCode is not null && toCode is not null &&
+                string.Equals(fromCode, toCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return $"A flight cannot use {fromCode} as both origin and destination. That route contradicts itself, so there is no count to return.";
+            }
+
+            if (fromCode is not null && arrivingAt is not null &&
+                string.Equals(fromCode, arrivingAt, StringComparison.OrdinalIgnoreCase))
+            {
+                return $"A flight cannot use {fromCode} as both origin and destination. That route contradicts itself, so there is no count to return.";
+            }
+        }
+
+        return null;
+    }
+
+    private static void RequireStatedAirports(
+        string question,
+        IReadOnlyList<AirportQuery> queries,
+        ICollection<string> errors)
+    {
+        RequireAirportRole(
+            question,
+            queries,
+            errors,
+            @"\bfrom\s+([A-Za-z]{3})\b",
+            asOrigin: true);
+
+        RequireAirportRole(
+            question,
+            queries,
+            errors,
+            @"\bdepart(?:ing|ure|ures)?\s+([A-Za-z]{3})\b",
+            asOrigin: true);
+
+        RequireAirportRole(
+            question,
+            queries,
+            errors,
+            @"\bto\s+([A-Za-z]{3})\b",
+            asOrigin: false);
+
+        RequireAirportRole(
+            question,
+            queries,
+            errors,
+            @"\barriv(?:ing|al|als)?\s+at\s+([A-Za-z]{3})\b",
+            asOrigin: false);
+    }
+
+    private static void RequireAirportRole(
+        string question,
+        IReadOnlyList<AirportQuery> queries,
+        ICollection<string> errors,
+        string pattern,
+        bool asOrigin)
+    {
+        foreach (Match match in Regex.Matches(
+            question,
+            pattern,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            var code = match.Groups[1].Value;
+            if (code.Any(char.IsLower))
+                continue;
+
+            code = code.ToUpperInvariant();
+            var preserved = asOrigin
+                ? queries.Any(query => string.Equals(query.Origin, code, StringComparison.OrdinalIgnoreCase))
+                : queries.Any(query => string.Equals(query.Destination, code, StringComparison.OrdinalIgnoreCase));
+
+            if (preserved)
+                continue;
+
+            var role = asOrigin ? "origin" : "destination";
+            var error = $"Plan dropped the requested {role} {code}. Keep {role}={code}.";
+            if (!errors.Contains(error))
+                errors.Add(error);
+        }
+    }
+
+    private static string? ReadAirportCode(string clause, string pattern)
+    {
+        var match = Regex.Match(
+            clause,
+            pattern,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        if (!match.Success || match.Groups[1].Value.Any(char.IsLower))
+            return null;
+
+        return match.Groups[1].Value.ToUpperInvariant();
+    }
+
+    private static bool AsksForOperationalStatus(string question)
+    {
+        return _statusIntentRegex.IsMatch(question)
+            || _scheduledStatusRegex.IsMatch(question);
+    }
+
+    // "scheduled at IAH on October 6" is a date filter. "currently scheduled"
+    // and "status Scheduled" are operational-status requests and are excluded.
+    private static bool AsksForScheduleDate(string question)
+    {
+        if (_scheduledStatusRegex.IsMatch(question) ||
+            !_scheduledWordRegex.IsMatch(question))
+        {
+            return false;
+        }
+
+        return ExtractExplicitDate(question).HasValue
+            || _relativeDateWordRegex.IsMatch(question)
+            || _scheduledForDateRegex.IsMatch(question);
     }
 
     private static DateOnly? ExtractExplicitDate(string question)
@@ -433,9 +593,18 @@ public sealed class AirportQueryValidator : IAirportQueryValidator
         if (flightType is null)
             return impliedType;
 
+        var mentionsArrival = _arrivalWordRegex.IsMatch(question);
+        var mentionsDeparture = _departureWordRegex.IsMatch(question);
+
+        // "Departing LAX and arriving at IAH" names both ends of one route.
+        // The airports decide the type. A question that only says "departures"
+        // keeps that explicit type so an impossible departure is rejected.
+        if (mentionsArrival && mentionsDeparture)
+            return impliedType;
+
         var explicitlyRequested = flightType == AirportFlightType.Arrival
-            ? _arrivalWordRegex.IsMatch(question)
-            : _departureWordRegex.IsMatch(question);
+            ? mentionsArrival
+            : mentionsDeparture;
 
         return explicitlyRequested ? flightType : impliedType;
     }
