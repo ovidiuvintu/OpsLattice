@@ -9,10 +9,12 @@
           {
             "tool": "get_flight_count",
             "arguments": {
-              "flightType": "Arrival",
               "origin": "LAX",
               "destination": "IAH",
               "date": "2026-10-06"
+            },
+            "optionalArguments": {
+              "flightType": "Arrival"
             },
             "result": "8"
           }

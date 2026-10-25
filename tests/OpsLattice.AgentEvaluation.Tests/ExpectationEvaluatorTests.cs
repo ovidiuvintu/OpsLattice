@@ -197,6 +197,97 @@ public sealed class ExpectationEvaluatorTests
         Assert.Contains("clarification", failure, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Evaluate_WhenRouteCallOmitsOptionalFlightType_ShouldPass()
+    {
+        var evaluation = ExpectationEvaluator.Evaluate(
+            LaxToIahRoute(),
+            "airport-operations",
+            "There are 8 flights flying from LAX to IAH today, 2026-10-06.",
+            llmInvocationCount: 3,
+            totalDurationMs: 4733,
+            [FlightCount(null, "LAX", "IAH", "2026-10-06", "8")]);
+
+        Assert.True(evaluation.Passed);
+    }
+
+    [Fact]
+    public void Evaluate_WhenOptionalFlightTypeIsArrival_ShouldPass()
+    {
+        var evaluation = ExpectationEvaluator.Evaluate(
+            LaxToIahRoute(),
+            "airport-operations-planned",
+            "Flight count: 8.",
+            llmInvocationCount: 1,
+            totalDurationMs: 2896,
+            [FlightCount("Arrival", "LAX", "IAH", "2026-10-06", "8")]);
+
+        Assert.True(evaluation.Passed);
+    }
+
+    [Fact]
+    public void Evaluate_WhenOptionalFlightTypeIsDeparture_ShouldFail()
+    {
+        var evaluation = ExpectationEvaluator.Evaluate(
+            LaxToIahRoute(),
+            "airport-operations",
+            "There are 0 flights.",
+            llmInvocationCount: 2,
+            totalDurationMs: 4000,
+            [FlightCount("Departure", "LAX", "IAH", "2026-10-06", "0")]);
+
+        Assert.False(evaluation.Passed);
+    }
+
+    [Fact]
+    public void Evaluate_WhenAnUnlistedFilterIsAdded_ShouldFail()
+    {
+        var call = FlightCount(null, "LAX", "IAH", "2026-10-06", "8");
+        var arguments = new Dictionary<string, string>(call.Arguments, StringComparer.OrdinalIgnoreCase)
+        {
+            ["status"] = "Scheduled"
+        };
+
+        var evaluation = ExpectationEvaluator.Evaluate(
+            LaxToIahRoute(),
+            "airport-operations",
+            "There are 8 flights.",
+            llmInvocationCount: 2,
+            totalDurationMs: 4000,
+            [call with { Arguments = arguments }]);
+
+        Assert.False(evaluation.Passed);
+        Assert.Contains(
+            evaluation.AssertionFailures,
+            failure => failure.Contains("status=Scheduled", StringComparison.Ordinal));
+    }
+
+    private static EvaluationScenario LaxToIahRoute()
+    {
+        return new EvaluationScenario
+        {
+            Id = "lax-to-iah-today",
+            Question = "How many flights are flying from LAX to IAH today?",
+            Expectation = new ScenarioExpectation
+            {
+                Kind = ExpectationKinds.Results,
+                Calls =
+                [
+                    new ExpectedToolCall
+                    {
+                        Tool = "get_flight_count",
+                        Arguments = Arguments(null, "LAX", "IAH", "2026-10-06"),
+                        OptionalArguments = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["flightType"] = "Arrival"
+                        },
+                        Result = "8"
+                    }
+                ]
+            }
+        };
+    }
+
     private static EvaluationScenario LaxToIah()
     {
         return new EvaluationScenario
@@ -226,7 +317,7 @@ public sealed class ExpectationEvaluatorTests
     }
 
     private static ExpectedToolCall Expected(
-        string flightType,
+        string? flightType,
         string? origin,
         string? destination,
         string date,
@@ -241,7 +332,7 @@ public sealed class ExpectationEvaluatorTests
     }
 
     private static CapturedToolCall FlightCount(
-        string flightType,
+        string? flightType,
         string? origin,
         string? destination,
         string date,
@@ -255,16 +346,18 @@ public sealed class ExpectationEvaluatorTests
     }
 
     private static Dictionary<string, string> Arguments(
-        string flightType,
+        string? flightType,
         string? origin,
         string? destination,
         string date)
     {
         var arguments = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["flightType"] = flightType,
             ["date"] = date
         };
+
+        if (flightType is not null)
+            arguments["flightType"] = flightType;
 
         if (origin is not null)
             arguments["origin"] = origin;

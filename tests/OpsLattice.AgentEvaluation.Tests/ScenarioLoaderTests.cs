@@ -159,6 +159,12 @@ public sealed class ScenarioLoaderTests
         var scenarios = ScenarioLoader.LoadFile(path);
 
         Assert.Contains(scenarios, scenario => scenario.Id == "lax-to-iah-today");
+        var laxToIah = Assert.Single(scenarios, scenario => scenario.Id == "lax-to-iah-today");
+        var laxCall = Assert.Single(laxToIah.Expectation.Calls);
+        Assert.Equal("LAX", laxCall.Arguments["origin"]);
+        Assert.Equal("IAH", laxCall.Arguments["destination"]);
+        Assert.False(laxCall.Arguments.ContainsKey("flightType"));
+        Assert.Equal("Arrival", laxCall.OptionalArguments["flightType"]);
         Assert.Contains(
             scenarios,
             scenario => scenario.Id == "iah-from-iah"

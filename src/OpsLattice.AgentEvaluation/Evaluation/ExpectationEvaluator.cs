@@ -167,7 +167,7 @@ public static class ExpectationEvaluator
             if (!string.Equals(call.ToolName, expected.Tool, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            if (!ArgumentsMatch(expected.Arguments, call.Arguments))
+            if (!ArgumentsMatch(expected, call.Arguments))
                 continue;
 
             if (requireResult && !ResultsMatch(call.Result, expected.Result))
@@ -180,18 +180,27 @@ public static class ExpectationEvaluator
     }
 
     private static bool ArgumentsMatch(
-        IReadOnlyDictionary<string, string> expected,
+        ExpectedToolCall expected,
         IReadOnlyDictionary<string, string> actual)
     {
-        if (expected.Count != actual.Count)
-            return false;
-
-        foreach (var pair in expected)
+        foreach (var pair in expected.Arguments)
         {
             if (!actual.TryGetValue(pair.Key, out var actualValue))
                 return false;
 
             if (!string.Equals(pair.Value, actualValue, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        foreach (var pair in actual)
+        {
+            if (expected.Arguments.ContainsKey(pair.Key))
+                continue;
+
+            if (!expected.OptionalArguments.TryGetValue(pair.Key, out var allowed))
+                return false;
+
+            if (!string.Equals(allowed, pair.Value, StringComparison.OrdinalIgnoreCase))
                 return false;
         }
 
