@@ -61,11 +61,22 @@ public sealed class ControlledSimulationTests
             "get_simulation_time",
             new Dictionary<string, string>());
 
+        var reversedDeparture = await session.CallToolTextAsync(
+            "get_flight_count",
+            new Dictionary<string, string>
+            {
+                ["flightType"] = "Departure",
+                ["origin"] = "LAX",
+                ["destination"] = "IAH",
+                ["date"] = "2026-10-06"
+            });
+
         Assert.Equal("8", laxToIah.Trim());
         Assert.Equal("9", iahToOrd.Trim());
         Assert.Equal("50", arrivals.Trim());
         Assert.Equal("50", departures.Trim());
         Assert.Equal("0", arrivalsTomorrow.Trim());
         Assert.Contains("2026-10-06", simulationTime, StringComparison.Ordinal);
+        Assert.Contains("origin=IAH", reversedDeparture, StringComparison.Ordinal);
     }
 }
