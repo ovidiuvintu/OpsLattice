@@ -207,6 +207,12 @@ public sealed class AirportOperationsPlannedAgent(
         Validation errors:
         {errorText}
 
+        Repair guidance:
+        - Keep every filter the user asked for. Never drop a filter just to make the plan pass.
+        - Interpret "scheduled on/for <date>" as date intent, not status=Scheduled.
+        - Keep requested date/airport filters and split into multiple queries if needed.
+        - Flights to an airport other than IAH are Departures; flights from an airport other than IAH are Arrivals.
+
         Return a corrected plan JSON that satisfies the validation errors.
         Use the same schema and keep all requested parts of the question.
         """;

@@ -564,7 +564,7 @@ public sealed class AgentRunnerTests
             gateway.Object,
             NullLogger<AgentRunner>.Instance);
 
-        var agent = new AirportOperationsAgent(runner);
+        var agent = new AirportOperationsAgent(runner, gateway.Object);
 
         // Act
         var result = await agent.RunAsync(
@@ -583,5 +583,422 @@ public sealed class AgentRunnerTests
                 It.IsAny<IReadOnlyDictionary<string, object?>>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenAirportAgentAsksYearForToday_ShouldRepromptAndExecuteTools()
+    {
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        AgentTool[] tools =
+        [
+            CreateFlightCountTool(),
+            new AgentTool(
+                Name: "get_simulation_time",
+                Description: "Returns simulation time.",
+                Parameters: new
+                {
+                    type = "object",
+                    properties = new { },
+                    required = Array.Empty<string>()
+                })
+        ];
+
+        gateway.Setup(x => x.ListToolsAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tools);
+
+        llm.SetupSequence(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse(
+                "Which year do you mean for today?",
+                Array.Empty<AgentToolCall>(),
+                AgentResponseType.Clarification))
+            .ReturnsAsync(new AgentResponse(
+                null,
+                [
+                    new AgentToolCall("get_simulation_time", new Dictionary<string, object?>())
+                ]))
+            .ReturnsAsync(new AgentResponse(
+                null,
+                [
+                    new AgentToolCall(
+                        "get_flight_count",
+                        new Dictionary<string, object?>
+                        {
+                            ["origin"] = "IAH",
+                            ["destination"] = "LAX",
+                            ["flightType"] = "Departure",
+                            ["date"] = "2026-10-06"
+                        })
+                ]))
+            .ReturnsAsync(new AgentResponse(
+                "There are 5 flights from IAH to LAX today.",
+                Array.Empty<AgentToolCall>()));
+
+        gateway.Setup(x => x.CallToolAsync(
+                "get_simulation_time",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessToolResult("2026-10-06T10:00:00Z"));
+
+        gateway.Setup(x => x.CallToolAsync(
+                "get_flight_count",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessToolResult("5"));
+
+        var runner = CreateRunner(llm, gateway);
+
+        var result = await runner.RunAsync(
+            "airport-operations",
+            "Use MCP tools.",
+            ["get_flight_count", "get_simulation_time"],
+            "How many flights are flying from IAH to LAX today?");
+
+        Assert.Equal("There are 5 flights from IAH to LAX today.", result.Answer);
+
+        Assert.Contains(result.ToolExecutions, t => t.ToolName == "get_simulation_time");
+        Assert.Contains(result.ToolExecutions, t => t.ToolName == "get_flight_count");
+
+        gateway.Verify(x => x.CallToolAsync(
+                "get_simulation_time",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        gateway.Verify(x => x.CallToolAsync(
+                "get_flight_count",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenAirportAgentAnswersWithoutTool_ShouldRepromptAndExecuteTool()
+    {
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        AgentTool[] tools =
+        [
+            new AgentTool(
+                Name: "get_simulation_time",
+                Description: "Returns simulation time.",
+                Parameters: new
+                {
+                    type = "object",
+                    properties = new { },
+                    required = Array.Empty<string>()
+                })
+        ];
+
+        gateway.Setup(x => x.ListToolsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tools);
+
+        llm.SetupSequence(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse(
+                "There are 8 flights departing from LAX and arriving at IAH today.",
+                Array.Empty<AgentToolCall>()))
+            .ReturnsAsync(new AgentResponse(
+                null,
+                [new AgentToolCall("get_simulation_time", new Dictionary<string, object?>())]))
+            .ReturnsAsync(new AgentResponse(
+                "There are 8 flights departing from LAX and arriving at IAH today.",
+                Array.Empty<AgentToolCall>()));
+
+        gateway.Setup(x => x.CallToolAsync(
+                "get_simulation_time",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessToolResult("2026-10-06T10:00:00Z"));
+
+        var runner = CreateRunner(llm, gateway);
+
+        var result = await runner.RunAsync(
+            "airport-operations",
+            "Use MCP tools.",
+            ["get_simulation_time"],
+            "How many flights are departing LAX and arriving at IAH today?");
+
+        Assert.Equal(
+            "There are 8 flights departing from LAX and arriving at IAH today.",
+            result.Answer);
+
+        Assert.Contains(result.ToolExecutions, t => t.ToolName == "get_simulation_time");
+
+        gateway.Verify(x => x.CallToolAsync(
+                "get_simulation_time",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenAirportAgentHitsMaxIterations_ShouldReturnFallbackInsteadOfThrowing()
+    {
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        gateway.Setup(x => x.ListToolsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<AgentTool>());
+
+        llm.SetupSequence(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse("Which year do you mean for today?", Array.Empty<AgentToolCall>(), AgentResponseType.Clarification))
+            .ReturnsAsync(new AgentResponse("Please provide the full date with year for today.", Array.Empty<AgentToolCall>(), AgentResponseType.Clarification))
+            .ReturnsAsync(new AgentResponse("Which relative date do you mean for today?", Array.Empty<AgentToolCall>(), AgentResponseType.Clarification))
+            .ReturnsAsync(new AgentResponse("I need the exact date and year for today.", Array.Empty<AgentToolCall>(), AgentResponseType.Clarification))
+            .ReturnsAsync(new AgentResponse("Please confirm the year for today.", Array.Empty<AgentToolCall>(), AgentResponseType.Clarification));
+
+        var runner = CreateRunner(llm, gateway);
+
+        var result = await runner.RunAsync(
+            "airport-operations",
+            "Use MCP tools.",
+            ["get_simulation_time"],
+            "How many flights are departing LAX and arriving at IAH today?");
+
+        Assert.Contains("couldn't complete the request", result.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Last model response", result.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Please confirm the year for today.", result.Answer, StringComparison.Ordinal);
+        Assert.Equal(5, result.LlmExecutions.Count);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenQuestionMatchesScheduledAtAirportOnDate_ShouldUseDeterministicDualCounts()
+    {
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+        var capturedCallArguments = new List<IReadOnlyDictionary<string, object?>>();
+        var responseQueue = new Queue<AgentToolCallResult>(
+        [
+            CreateSuccessToolResult("8"),
+            CreateSuccessToolResult("10")
+        ]);
+
+        gateway.Setup(x => x.ListToolsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreateFlightCountTool()]);
+
+        gateway.Setup(x => x.CallToolAsync(
+                "get_flight_count",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IReadOnlyDictionary<string, object?>, CancellationToken>((_, args, _) =>
+                capturedCallArguments.Add(args))
+            .ReturnsAsync(() => responseQueue.Dequeue());
+
+        var runner = CreateRunner(llm, gateway);
+
+        var result = await runner.RunAsync(
+            "airport-operations",
+            "Use MCP tools.",
+            ["get_flight_count"],
+            "How many flights are scheduled at IAH on October 6, 2026?");
+
+        Assert.Equal(
+            "There are 18 flights scheduled at IAH on October 6, 2026 (arrivals: 8, departures: 10).",
+            result.Answer);
+        Assert.Empty(result.LlmExecutions);
+        Assert.Equal(2, result.ToolExecutions.Count);
+
+        Assert.Equal(2, capturedCallArguments.Count);
+
+        Assert.Equal("IAH", capturedCallArguments[0]["destination"]);
+        Assert.Equal("Arrival", capturedCallArguments[0]["flightType"]);
+        Assert.Equal("2026-10-06", capturedCallArguments[0]["date"]);
+
+        Assert.Equal("IAH", capturedCallArguments[1]["origin"]);
+        Assert.Equal("Departure", capturedCallArguments[1]["flightType"]);
+        Assert.Equal("2026-10-06", capturedCallArguments[1]["date"]);
+
+        llm.Verify(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        gateway.Verify(x => x.CallToolAsync(
+                "get_flight_count",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenAirportAgentOffersToListInsteadOfListing_ShouldRepromptOnceToCallSearchFlights()
+    {
+        // Arrange
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        AgentTool[] tools =
+        [
+            CreateFlightCountTool(),
+            new AgentTool(
+                Name: "search_flights",
+                Description: "Lists flights matching filters.",
+                Parameters: new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        destination = new { type = "string" },
+                        flightType = new { type = "string" }
+                    },
+                    required = Array.Empty<string>()
+                })
+        ];
+
+        gateway.Setup(x => x.ListToolsAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tools);
+
+        var filters = new Dictionary<string, object?>
+        {
+            ["destination"] = "DEN",
+            ["flightType"] = "Departure"
+        };
+
+        llm.SetupSequence(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse(null, [new AgentToolCall("get_flight_count", filters)]))
+            .ReturnsAsync(new AgentResponse(
+                "There are 2 flights to DEN. Would you like me to list the details?",
+                []))
+            .ReturnsAsync(new AgentResponse(null, [new AgentToolCall("search_flights", filters)]))
+            .ReturnsAsync(new AgentResponse(
+                "There are 2 flights to DEN: AA1041 and WN1053.",
+                []));
+
+        gateway.Setup(x => x.CallToolAsync(
+                "get_flight_count",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessToolResult("2"));
+
+        gateway.Setup(x => x.CallToolAsync(
+                "search_flights",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessToolResult(
+                "[{\"flightNumber\":\"AA1041\"},{\"flightNumber\":\"WN1053\"}]"));
+
+        var runner = CreateRunner(llm, gateway);
+
+        // Act
+        var result = await runner.RunAsync(
+            "airport-operations",
+            "system prompt",
+            ["get_flight_count", "search_flights"],
+            "How many flights to DEN? If you find any flights to DEN, can you list the details?");
+
+        // Assert
+        Assert.Equal("There are 2 flights to DEN: AA1041 and WN1053.", result.Answer);
+        Assert.Contains(result.ToolExecutions, execution => execution.ToolName == "search_flights");
+
+        gateway.Verify(x => x.CallToolAsync(
+                "search_flights",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenAirportAgentAsksForYearOfCompleteDate_ShouldPushBackOnceAndUseTools()
+    {
+        // Arrange
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        gateway.Setup(x => x.ListToolsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreateFlightCountTool()]);
+
+        var arrivals = new Dictionary<string, object?>
+        {
+            ["origin"] = "LAX",
+            ["destination"] = "IAH",
+            ["flightType"] = "Arrival",
+            ["date"] = "2026-10-06"
+        };
+
+        llm.SetupSequence(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse(
+                "Which year do you mean for October 6?",
+                [],
+                AgentResponseType.Clarification))
+            .ReturnsAsync(new AgentResponse(null, [new AgentToolCall("get_flight_count", arrivals)]))
+            .ReturnsAsync(new AgentResponse("There are 8 arrivals from LAX on October 6, 2026.", []));
+
+        gateway.Setup(x => x.CallToolAsync(
+                "get_flight_count",
+                It.IsAny<IReadOnlyDictionary<string, object?>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessToolResult("8"));
+
+        var runner = CreateRunner(llm, gateway);
+
+        // Act
+        var result = await runner.RunAsync(
+            "airport-operations",
+            "system prompt",
+            ["get_flight_count"],
+            "How many flights are arriving from LAX on October 6, 2026?");
+
+        // Assert
+        Assert.Equal("There are 8 arrivals from LAX on October 6, 2026.", result.Answer);
+        Assert.Equal(3, result.LlmExecutions.Count);
+        Assert.Single(result.ToolExecutions);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenAirportAgentKeepsAskingAfterPushBack_ShouldReturnItsQuestion()
+    {
+        // Arrange
+        var llm = new Mock<ILlmClient>();
+        var gateway = new Mock<IAgentToolGateway>();
+
+        gateway.Setup(x => x.ListToolsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreateFlightCountTool()]);
+
+        llm.SetupSequence(x => x.ChatAsync(
+                It.IsAny<IReadOnlyList<AgentMessage>>(),
+                It.IsAny<IReadOnlyList<AgentTool>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse(
+                "Which airline do you mean?",
+                [],
+                AgentResponseType.Clarification))
+            .ReturnsAsync(new AgentResponse(
+                "I still need the airline.",
+                [],
+                AgentResponseType.Clarification));
+
+        var runner = CreateRunner(llm, gateway);
+
+        // Act
+        var result = await runner.RunAsync(
+            "airport-operations",
+            "system prompt",
+            ["get_flight_count"],
+            "How many flights does the airline operate on October 6, 2026?");
+
+        // Assert
+        Assert.Equal("I still need the airline.", result.Answer);
+        Assert.Equal(2, result.LlmExecutions.Count);
+        Assert.Empty(result.ToolExecutions);
     }
 }

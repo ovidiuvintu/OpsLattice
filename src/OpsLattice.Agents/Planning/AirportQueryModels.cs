@@ -19,7 +19,12 @@ public enum AirportFlightStatus
     Scheduled,
     Approaching,
     Landed,
-    Departed
+    AtGate,
+    Boarding,
+    ReadyForDeparture,
+    Departed,
+    Delayed,
+    Cancelled
 }
 
 public sealed record AirportQueryPlanDraft(

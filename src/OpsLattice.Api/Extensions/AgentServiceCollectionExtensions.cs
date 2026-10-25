@@ -19,6 +19,10 @@ public static class AgentServiceCollectionExtensions
         var mcpBaseUrl = configuration["Mcp:BaseUrl"]
             ?? "http://localhost:5160/mcp";
 
+        // Ollama model settings (Ollama:Model, Ollama:ContextLength, Ollama:Think)
+        services.Configure<OllamaOptions>(
+            configuration.GetSection("Ollama"));
+
         // MCP tool gateway
         services.AddSingleton<IAgentToolGateway>(_ =>
             new McpAgentToolGateway(new Uri(mcpBaseUrl)));

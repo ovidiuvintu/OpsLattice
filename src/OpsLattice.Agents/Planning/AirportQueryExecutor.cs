@@ -10,7 +10,7 @@ public sealed class AirportQueryExecutor(
     IAgentToolGateway toolGateway) : IAirportQueryExecutor
 {
     private const string _flightCountTool = "get_flight_count";
-    private const string _flightsTool = "get_flights";
+    private const string _searchFlightsTool = "search_flights";
     private const string _flightSummaryTool = "get_flight_summary";
     private const string _simulationTimeTool = "get_simulation_time";
 
@@ -279,7 +279,7 @@ public sealed class AirportQueryExecutor(
         return operation switch
         {
             AirportQueryOperation.CountFlights => _flightCountTool,
-            AirportQueryOperation.ListFlights => _flightsTool,
+            AirportQueryOperation.ListFlights => _searchFlightsTool,
             AirportQueryOperation.FlightSummary => _flightSummaryTool,
             AirportQueryOperation.GetSimulationTime => _simulationTimeTool,
             _ => throw new NotSupportedException(

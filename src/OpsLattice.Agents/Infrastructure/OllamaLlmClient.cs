@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -12,6 +14,11 @@ namespace OpsLattice.Agents.Infrastructure;
 public sealed class OllamaLlmClient(
     HttpClient httpClient, IOptions<OllamaOptions> options, ILogger<OllamaLlmClient> logger) : ILlmClient
 {
+    // Models that rejected the "think" option (older, non-reasoning models).
+    // Remembered so only the first request to such a model needs a retry.
+    private static readonly ConcurrentDictionary<string, bool> _modelsWithoutThinking =
+        new(StringComparer.Ordinal);
+
     public async Task<AgentResponse> ChatAsync(
         IReadOnlyList<AgentMessage> messages,
         IReadOnlyList<AgentTool> tools,
@@ -67,12 +74,10 @@ public sealed class OllamaLlmClient(
                 }
             }).ToArray();
 
-        var request = new
+        var request = new JsonObject
         {
-            model = options.Value.Model,
-            messages = ollamaMessages,
-            tools = ollamaTools,
-            stream = false
+            ["messages"] = new JsonArray(ollamaMessages),
+            ["tools"] = JsonSerializer.SerializeToNode(ollamaTools)
         };
 
         stageStopwatch.Stop();
@@ -83,8 +88,7 @@ public sealed class OllamaLlmClient(
 
         stageStopwatch.Restart();
 
-        using var response = await httpClient.PostAsJsonAsync(
-            "/api/chat",
+        using var response = await PostChatAsync(
             request,
             cancellationToken);
 
@@ -213,19 +217,17 @@ public sealed class OllamaLlmClient(
         string prompt,
         CancellationToken cancellationToken = default)
     {
-        var request = new
+        var request = new JsonObject
         {
-            model = options.Value.Model,
-            messages = new[]
-            {
-                new { role = "user", content = prompt }
-            },
-            stream = false,
-            keep_alive = "30m"
+            ["messages"] = new JsonArray(
+                new JsonObject
+                {
+                    ["role"] = "user",
+                    ["content"] = prompt
+                })
         };
 
-        using var response = await httpClient.PostAsJsonAsync(
-            "/api/chat",
+        using var response = await PostChatAsync(
             request,
             cancellationToken);
 
@@ -237,6 +239,65 @@ public sealed class OllamaLlmClient(
         return result?.Message?.Content
             ?? throw new InvalidOperationException(
                 "Ollama returned an empty response.");
+    }
+
+    private async Task<HttpResponseMessage> PostChatAsync(
+        JsonObject request,
+        CancellationToken cancellationToken)
+    {
+        var settings = options.Value;
+        var model = settings.Model;
+
+        request["model"] = model;
+        request["stream"] = false;
+        request["keep_alive"] = settings.KeepAlive;
+
+        if (settings.ContextLength > 0)
+        {
+            request["options"] = new JsonObject
+            {
+                ["num_ctx"] = settings.ContextLength
+            };
+        }
+
+        if (settings.Think.HasValue &&
+            !_modelsWithoutThinking.ContainsKey(model))
+        {
+            request["think"] = settings.Think.Value;
+        }
+
+        var response = await httpClient.PostAsJsonAsync(
+            "/api/chat",
+            request,
+            cancellationToken);
+
+        if (response.StatusCode != HttpStatusCode.BadRequest ||
+            !request.ContainsKey("think"))
+        {
+            return response;
+        }
+
+        var error = await response.Content.ReadAsStringAsync(
+            cancellationToken);
+
+        // Reading the body buffers it, so the caller can still inspect the
+        // original response when the error is about something else.
+        if (!error.Contains("think", StringComparison.OrdinalIgnoreCase))
+            return response;
+
+        response.Dispose();
+
+        _modelsWithoutThinking[model] = true;
+        request.Remove("think");
+
+        logger.LogInformation(
+            "Ollama model {Model} does not support the think option; retrying without it.",
+            model);
+
+        return await httpClient.PostAsJsonAsync(
+            "/api/chat",
+            request,
+            cancellationToken);
     }
 
     private sealed record OllamaChatResponse(

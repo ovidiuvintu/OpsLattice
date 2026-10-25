@@ -1,12 +1,23 @@
-
+using System.Globalization;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using OpsLattice.Agents.Abstractions;
 using OpsLattice.Agents.Models;
 using OpsLattice.Agents.Orchestration;
 
 namespace OpsLattice.Agents.Agents;
 
-public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
+public sealed class AirportOperationsAgent(
+    AgentRunner runner,
+    IAgentToolGateway toolGateway) : IAgent
 {
+    private const string _simulationTimeTool = "get_simulation_time";
+
+    // Questions that depend on "now" get the simulation clock up front, so the
+    // model never has to remember to look it up (or guess a year).
+    private static readonly Regex _relativeTimeRegex = new(
+        "\\b(?:today|tonight|tomorrow|yesterday|now|currently|current|so far)\\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private const string _systemPrompt = """
     ROLE AND SCOPE
@@ -77,7 +88,10 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
          - Yesterday: simulation date minus one day.
 
     3.6. When a relative date is requested:
-         - Call get_simulation_time first.
+         - If a SIMULATION CONTEXT section appears at the end
+           of these instructions, use its dates exactly and do
+           not call get_simulation_time.
+         - Otherwise call get_simulation_time first.
          - Resolve the requested date from its result.
          - Pass the resolved date to the flight-query tool.
          - Never use date=null for a date-specific query.
@@ -119,14 +133,15 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
     5.1. Use get_flight_summary only for unfiltered totals
          and overall simulation statistics.
 
-    5.2. Use get_flight_count for count questions when the
-         requested filters are supported by that tool.
+    5.2. Use get_flight_count for every "how many" question,
+         including counts by current operational status.
 
-    5.3. Use get_flights when the user requests individual
-         flight details, flight listings, or counts by
-         current operational status.
+    5.3. Use search_flights when the user requests individual
+         flight details or flight listings. Pass the filters
+         the user asked for; the tool does the filtering.
 
-    5.4. Do not call get_flights merely to calculate a count.
+    5.4. Never count or filter flights yourself. Do not call
+         search_flights merely to calculate a count.
 
     5.5. Use get_simulation_time for questions about the
          active simulation date or time and for resolving
@@ -149,17 +164,21 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
          - Arrival
          - Departure
 
-    6.4. get_flight_count supports these filters only:
+    6.4. get_flight_count and search_flights support these
+         filters only:
          - origin
          - destination
          - flightType
          - date
+         - status
 
     6.5. Never confuse flightType with status.
 
-    6.6. get_flight_count does not support status.
-         For status-based counts, call get_flights and
-         count matching statuses from the returned list.
+    6.6. status is the current operational state, one of:
+         Scheduled, Approaching, Landed, AtGate, Boarding,
+         ReadyForDeparture, Departed, Delayed, Cancelled.
+         Use it only when the user asks about current state
+         (for example "have landed", "approaching right now").
 
     6.7. When the user asks how many flights are scheduled
          on a particular date, use the requested date.
@@ -204,6 +223,14 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
 
     7.6. Never answer a portion of a multi-part question
          without supporting MCP results.
+
+    7.7. If the user asks for a count and also asks to list
+         or show the flights or their details, even
+         conditionally ("if there are any, list them"),
+         call get_flight_count and search_flights with the
+         same filters and answer with both. Never ask
+         whether the user wants details they already
+         requested.
 
     --------------------------------------------------
     8. RESPONSE AND EVIDENCE RULES
@@ -288,12 +315,13 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
     on October 6, 2026.
 
     Action:
-    Call get_flights with no arguments.
+    Call search_flights with:
+    origin = IAH
+    destination = ORD
+    flightType = Departure
+    date = 2026-10-06
 
-    Filter the returned flights in your reasoning to match
-    origin=IAH and destination=ORD.
-
-    Return the matching flight details.
+    Return the flights exactly as returned by the tool.
 
     EXAMPLE F - Operational status
 
@@ -301,11 +329,41 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
     How many flights currently have status Scheduled?
 
     Action:
-    Call get_flights with no arguments.
-
-    Count flights where status is Scheduled.
+    Call get_flight_count with:
+    status = Scheduled
 
     Do not add a date filter unless requested.
+
+    EXAMPLE H - Count and conditional details
+
+    User:
+    How many flights to DEN? If you find any, list the details.
+
+    Action:
+    Call get_flight_count with:
+    flightType = Departure
+    destination = DEN
+
+    Call search_flights with:
+    flightType = Departure
+    destination = DEN
+
+    Report the count, then list each flight returned.
+    If the count is zero, say so; there is nothing to list.
+
+    EXAMPLE G - Arrivals from another airport
+
+    User:
+    How many arrivals from PHX?
+
+    Action:
+    Call get_flight_count with:
+    flightType = Arrival
+    origin = PHX
+    destination = IAH
+
+    The other airport is always the origin for arrivals
+    and the destination for departures.
 
     --------------------------------------------------
     10. FINAL VALIDATION BEFORE RESPONDING
@@ -329,21 +387,107 @@ public sealed class AirportOperationsAgent(AgentRunner runner) : IAgent
     [
         "get_flight_summary",
         "get_flight_count",
-        "get_flights",
+        "search_flights",
         "get_simulation_time"
     ];
 
     public string Name => "airport-operations";
 
-    public Task<AgentExecutionResult> RunAsync(
+    public async Task<AgentExecutionResult> RunAsync(
         string question,
         CancellationToken cancellationToken = default)
     {
-        return runner.RunAsync(
+        var systemPrompt = _systemPrompt;
+
+        if (!string.IsNullOrWhiteSpace(question) &&
+            _relativeTimeRegex.IsMatch(question))
+        {
+            var simulationContext = await TryBuildSimulationContextAsync(
+                cancellationToken);
+
+            if (simulationContext is not null)
+                systemPrompt += simulationContext;
+        }
+
+        return await runner.RunAsync(
             Name,
-            _systemPrompt,
+            systemPrompt,
             _allowedTools,
             question,
             cancellationToken);
+    }
+
+    private async Task<string?> TryBuildSimulationContextAsync(
+        CancellationToken cancellationToken)
+    {
+        AgentToolCallResult? result;
+
+        try
+        {
+            result = await toolGateway.CallToolAsync(
+                _simulationTimeTool,
+                new Dictionary<string, object?>(),
+                cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            // Fall back to the model calling get_simulation_time itself.
+            return null;
+        }
+
+        if (result is null ||
+            !result.IsSuccess ||
+            !TryParseSimulationTime(result.Content, out var now))
+        {
+            return null;
+        }
+
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+
+        return string.Create(CultureInfo.InvariantCulture, $"""
+
+
+            --------------------------------------------------
+            SIMULATION CONTEXT
+            --------------------------------------------------
+
+            Current simulation time: {now.UtcDateTime:yyyy-MM-dd HH:mm} UTC
+            Today (simulation): {today:yyyy-MM-dd}
+            Tomorrow (simulation): {today.AddDays(1):yyyy-MM-dd}
+            Yesterday (simulation): {today.AddDays(-1):yyyy-MM-dd}
+
+            Use these exact dates for today, tomorrow and yesterday.
+            Never use the real-world date or a different year.
+            """);
+    }
+
+    private static bool TryParseSimulationTime(
+        string? content,
+        out DateTimeOffset value)
+    {
+        value = default;
+
+        if (string.IsNullOrWhiteSpace(content))
+            return false;
+
+        var text = content.Trim();
+
+        if (text.StartsWith('"'))
+        {
+            try
+            {
+                text = JsonSerializer.Deserialize<string>(text) ?? string.Empty;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
+
+        return DateTimeOffset.TryParse(
+            text,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out value);
     }
 }
