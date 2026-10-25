@@ -1,6 +1,6 @@
 # Agent evaluation
 
-Generated: 2026-10-25 14:21:17+00:00
+Generated: 2026-10-25 14:24:38+00:00
 Ollama: qwen2.5:7b-instruct-q4_K_M at http://127.0.0.1:11434
 Simulation: 100 flights, schedule date 2026-10-06, seed 42
 
@@ -10,8 +10,8 @@ A run passes when the MCP flight-tool arguments and results match the scenario. 
 
 | Agent | Passed | Failed | LLM calls | MCP calls | Duration (ms) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| airport-operations-planned | 1 | 0 | 1 | 1 | 2970 |
-| airport-operations | 0 | 1 | 2 | 1 | 2222 |
+| airport-operations-planned | 1 | 0 | 1 | 1 | 2896 |
+| airport-operations | 0 | 1 | 3 | 1 | 4733 |
 
 Overall: 1 passed, 1 failed, 2 runs.
 
@@ -23,7 +23,7 @@ How many flights are flying from LAX to IAH today?
 
 - LLM invocations: 1
 - MCP invocations: 1
-- Duration: 2970 ms
+- Duration: 2896 ms
 
 Answer:
 
@@ -31,7 +31,7 @@ Answer:
 
 Tool calls:
 
-- get_flight_count (13 ms) date=2026-10-06, destination=IAH, flightType=Arrival, origin=LAX
+- get_flight_count (28 ms) date=2026-10-06, destination=IAH, flightType=Arrival, origin=LAX
   - result: 8
 
 Validation errors:
@@ -48,17 +48,17 @@ Assertion failures:
 
 ### airport-operations: FAIL
 
-- LLM invocations: 2
+- LLM invocations: 3
 - MCP invocations: 1
-- Duration: 2222 ms
+- Duration: 4733 ms
 
 Answer:
 
-> There are 8 flights flying from LAX to IAH today.
+> There are 8 flights flying from LAX to IAH today, 2026-10-06.
 
 Tool calls:
 
-- get_flight_count (7 ms) date=2026-10-06, destination=IAH, origin=LAX
+- get_flight_count (10 ms) date=2026-10-06, destination=IAH, origin=LAX
   - result: 8
 
 Validation errors:

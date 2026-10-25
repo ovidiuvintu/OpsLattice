@@ -48,6 +48,9 @@ public sealed class ExpectedToolCall
     public IReadOnlyDictionary<string, string> Arguments { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+    public IReadOnlyDictionary<string, string> OptionalArguments { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
     public string Result { get; init; } = string.Empty;
 }
 

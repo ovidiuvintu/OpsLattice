@@ -112,20 +112,19 @@ public static class ScenarioLoader
             call.Tool,
             $"Scenario '{scenarioId}' tool name");
 
-        var arguments = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
+        var arguments = ReadArguments(
+            scenarioId,
+            call.Arguments);
+        var optionalArguments = ReadArguments(
+            scenarioId,
+            call.OptionalArguments);
 
-        if (call.Arguments is not null)
+        foreach (var key in optionalArguments.Keys)
         {
-            foreach (var pair in call.Arguments)
+            if (arguments.ContainsKey(key))
             {
-                if (string.IsNullOrWhiteSpace(pair.Key))
-                {
-                    throw new InvalidDataException(
-                        $"Scenario '{scenarioId}' has an empty argument name.");
-                }
-
-                arguments[pair.Key] = pair.Value ?? string.Empty;
+                throw new InvalidDataException(
+                    $"Scenario '{scenarioId}' lists '{key}' as both a required and an optional argument.");
             }
         }
 
@@ -140,8 +139,33 @@ public static class ScenarioLoader
         {
             Tool = tool,
             Arguments = arguments,
+            OptionalArguments = optionalArguments,
             Result = call.Result?.Trim() ?? string.Empty
         };
+    }
+
+    private static Dictionary<string, string> ReadArguments(
+        string scenarioId,
+        Dictionary<string, string?>? source)
+    {
+        var arguments = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+
+        if (source is null)
+            return arguments;
+
+        foreach (var pair in source)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key))
+            {
+                throw new InvalidDataException(
+                    $"Scenario '{scenarioId}' has an empty argument name.");
+            }
+
+            arguments[pair.Key] = pair.Value ?? string.Empty;
+        }
+
+        return arguments;
     }
 
     private static string RequireText(string? value, string label)
@@ -178,6 +202,8 @@ public static class ScenarioLoader
         public string? Tool { get; init; }
 
         public Dictionary<string, string?>? Arguments { get; init; }
+
+        public Dictionary<string, string?>? OptionalArguments { get; init; }
 
         public string? Result { get; init; }
     }
