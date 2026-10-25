@@ -1,0 +1,124 @@
+{
+  "scenarios": [
+    {
+      "id": "lax-to-iah-today",
+      "question": "How many flights are flying from LAX to IAH today?",
+      "expectation": {
+        "kind": "results",
+        "calls": [
+          {
+            "tool": "get_flight_count",
+            "arguments": {
+              "flightType": "Arrival",
+              "origin": "LAX",
+              "destination": "IAH",
+              "date": "2026-10-06"
+            },
+            "result": "8"
+          }
+        ]
+      }
+    },
+    {
+      "id": "departing-lax-arriving-iah",
+      "question": "How many flights are departing LAX and arriving at IAH today?",
+      "expectation": {
+        "kind": "results",
+        "calls": [
+          {
+            "tool": "get_flight_count",
+            "arguments": {
+              "flightType": "Arrival",
+              "origin": "LAX",
+              "destination": "IAH",
+              "date": "2026-10-06"
+            },
+            "result": "8"
+          }
+        ]
+      }
+    },
+    {
+      "id": "iah-arrivals-and-departures",
+      "question": "How many arrivals and how many departures are scheduled at IAH on October 6, 2026?",
+      "expectation": {
+        "kind": "results",
+        "calls": [
+          {
+            "tool": "get_flight_count",
+            "arguments": {
+              "flightType": "Arrival",
+              "destination": "IAH",
+              "date": "2026-10-06"
+            },
+            "result": "50"
+          },
+          {
+            "tool": "get_flight_count",
+            "arguments": {
+              "flightType": "Departure",
+              "origin": "IAH",
+              "date": "2026-10-06"
+            },
+            "result": "50"
+          }
+        ]
+      }
+    },
+    {
+      "id": "lax-arrivals-and-ord-departures",
+      "question": "How many flights are arriving from LAX, and how many are departing to ORD, on October 6, 2026?",
+      "expectation": {
+        "kind": "results",
+        "calls": [
+          {
+            "tool": "get_flight_count",
+            "arguments": {
+              "flightType": "Arrival",
+              "origin": "LAX",
+              "destination": "IAH",
+              "date": "2026-10-06"
+            },
+            "result": "8"
+          },
+          {
+            "tool": "get_flight_count",
+            "arguments": {
+              "flightType": "Departure",
+              "origin": "IAH",
+              "destination": "ORD",
+              "date": "2026-10-06"
+            },
+            "result": "9"
+          }
+        ]
+      }
+    },
+    {
+      "id": "arrivals-tomorrow",
+      "question": "How many arrivals are scheduled at IAH tomorrow?",
+      "expectation": {
+        "kind": "results",
+        "calls": [
+          {
+            "tool": "get_flight_count",
+            "arguments": {
+              "flightType": "Arrival",
+              "destination": "IAH",
+              "date": "2026-10-07"
+            },
+            "result": "0"
+          }
+        ]
+      }
+    },
+    {
+      "id": "iah-from-iah",
+      "question": "How many flights are arriving at IAH from IAH on October 6, 2026?",
+      "expectation": {
+        "kind": "failure",
+        "calls": []
+      }
+    }
+  ]
+}
