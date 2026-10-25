@@ -85,7 +85,7 @@ public sealed class AirportQueryExecutor(
                     IsSuccess: false,
                     ToolName: toolName,
                     Arguments: arguments.Values,
-                    Result: $"Tool '{toolName}' does not support argument(s): {string.Join(", ", unsupportedKeys)}.",
+                    Result: $"Tool '{toolName}' does not support argument(s): {string.Join(", ", unsupportedKeys)}. The filter was not executed.",
                     DurationMs: 0));
                 continue;
             }

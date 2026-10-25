@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using OpsLattice.Scenarios.Airport.Flights;
 using OpsLattice.Scenarios.Airport.Simulation;
@@ -31,7 +32,7 @@ public sealed class FlightTools(
             return nameof(FlightType.Departure);
         }
 
-        throw new ArgumentException(
+        throw new McpException(
             "flightType must be 'Arrival' or 'Departure'. Omit flightType to include all flight types.");
     }
 
@@ -46,7 +47,7 @@ public sealed class FlightTools(
             return value.ToString();
         }
 
-        throw new ArgumentException(
+        throw new McpException(
             $"status must be one of: {string.Join(", ", Enum.GetNames<FlightStatus>())}. Omit status to include all statuses.");
     }
 
@@ -62,7 +63,7 @@ public sealed class FlightTools(
                 System.Globalization.DateTimeStyles.None,
                 out var value))
         {
-            throw new ArgumentException(
+            throw new McpException(
                 "Date must be in YYYY-MM-DD format.");
         }
 
@@ -106,14 +107,14 @@ public sealed class FlightTools(
             && !string.IsNullOrWhiteSpace(destination)
             && !string.Equals(destination, airportCode, StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException(
+            throw new McpException(
                 $"Arrival flights require destination={airportCode} when destination is specified; received destination={destination}.");
         }
 
         if (string.Equals(flightType, _arrival, StringComparison.OrdinalIgnoreCase)
             && string.Equals(origin, airportCode, StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException(
+            throw new McpException(
                 $"Arrival flights cannot use origin={airportCode}; use destination={airportCode} for arrivals at the primary airport.");
         }
 
@@ -121,14 +122,14 @@ public sealed class FlightTools(
             && !string.IsNullOrWhiteSpace(origin)
             && !string.Equals(origin, airportCode, StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException(
+            throw new McpException(
                 $"Departure flights require origin={airportCode} when origin is specified; received origin={origin}.");
         }
 
         if (string.Equals(flightType, _departure, StringComparison.OrdinalIgnoreCase)
             && string.Equals(destination, airportCode, StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException(
+            throw new McpException(
                 $"Departure flights cannot use destination={airportCode}; use origin={airportCode} for departures from the primary airport.");
         }
     }

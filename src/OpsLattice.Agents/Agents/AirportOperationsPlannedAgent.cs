@@ -209,7 +209,10 @@ public sealed class AirportOperationsPlannedAgent(
 
         Repair guidance:
         - Keep every filter the user asked for. Never drop a filter just to make the plan pass.
-        - Interpret "scheduled on/for <date>" as date intent, not status=Scheduled.
+        - Never drop an origin, destination, or date the user named.
+        - A contradictory route, such as arriving at IAH from IAH, cannot be repaired by deleting an airport.
+        - "Departing LAX and arriving at IAH" is one Arrival with origin=LAX and destination=IAH.
+        - Interpret "scheduled on/for <date>" and "scheduled at <airport> on <date>" as date intent, not status=Scheduled.
         - Keep requested date/airport filters and split into multiple queries if needed.
         - Flights to an airport other than IAH are Departures; flights from an airport other than IAH are Arrivals.
 
