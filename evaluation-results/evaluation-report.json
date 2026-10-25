@@ -1,0 +1,90 @@
+{
+  "generatedAt": "2026-10-25T14:21:17.4724383+00:00",
+  "ollamaModel": "qwen2.5:7b-instruct-q4_K_M",
+  "ollamaBaseUrl": "http://127.0.0.1:11434",
+  "simulation": {
+    "flightCount": 100,
+    "scheduleDate": "2026-10-06",
+    "randomSeed": 42
+  },
+  "results": [
+    {
+      "scenarioId": "lax-to-iah-today",
+      "question": "How many flights are flying from LAX to IAH today?",
+      "agentName": "airport-operations-planned",
+      "answer": "Flight count (flightType=Arrival, origin=LAX, destination=IAH, date=today): 8.",
+      "llmInvocationCount": 1,
+      "mcpInvocationCount": 1,
+      "totalDurationMs": 2970,
+      "toolCalls": [
+        {
+          "toolName": "get_flight_count",
+          "arguments": {
+            "origin": "LAX",
+            "destination": "IAH",
+            "flightType": "Arrival",
+            "date": "2026-10-06"
+          },
+          "result": "8",
+          "durationMs": 13
+        }
+      ],
+      "validationErrors": [],
+      "executionErrors": [],
+      "passed": true,
+      "assertionFailures": []
+    },
+    {
+      "scenarioId": "lax-to-iah-today",
+      "question": "How many flights are flying from LAX to IAH today?",
+      "agentName": "airport-operations",
+      "answer": "There are 8 flights flying from LAX to IAH today.",
+      "llmInvocationCount": 2,
+      "mcpInvocationCount": 1,
+      "totalDurationMs": 2222,
+      "toolCalls": [
+        {
+          "toolName": "get_flight_count",
+          "arguments": {
+            "destination": "IAH",
+            "date": "2026-10-06",
+            "origin": "LAX"
+          },
+          "result": "8",
+          "durationMs": 7
+        }
+      ],
+      "validationErrors": [],
+      "executionErrors": [],
+      "passed": false,
+      "assertionFailures": [
+        "Expected get_flight_count {date=2026-10-06, destination=IAH, flightType=Arrival, origin=LAX} result 8. No matching MCP call was found. Actual flight calls: get_flight_count {date=2026-10-06, destination=IAH, origin=LAX} result 8.",
+        "Unexpected MCP flight call get_flight_count {date=2026-10-06, destination=IAH, origin=LAX} result 8."
+      ]
+    }
+  ],
+  "aggregate": {
+    "scenarioCount": 1,
+    "runCount": 2,
+    "passed": 1,
+    "failed": 1,
+    "agents": [
+      {
+        "agentName": "airport-operations-planned",
+        "passed": 1,
+        "failed": 0,
+        "llmInvocationCount": 1,
+        "mcpInvocationCount": 1,
+        "totalDurationMs": 2970
+      },
+      {
+        "agentName": "airport-operations",
+        "passed": 0,
+        "failed": 1,
+        "llmInvocationCount": 2,
+        "mcpInvocationCount": 1,
+        "totalDurationMs": 2222
+      }
+    ]
+  }
+}

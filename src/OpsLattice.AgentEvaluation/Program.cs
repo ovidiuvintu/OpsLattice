@@ -78,6 +78,8 @@ var report = await session.EvaluateAsync(
         Console.WriteLine(
             $"{evaluation.ScenarioId}  {evaluation.AgentName}  {status}  llm={evaluation.LlmInvocationCount}  mcp={evaluation.McpInvocationCount}  {evaluation.TotalDurationMs}ms");
     },
+    (scenarioId, agentName) =>
+        Console.WriteLine($"{scenarioId}  {agentName}  running"),
     cancellation.Token);
 
 var paths = ReportWriter.Write(report, options.OutputDirectory);

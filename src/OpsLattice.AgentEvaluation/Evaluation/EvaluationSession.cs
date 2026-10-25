@@ -42,7 +42,10 @@ public sealed class EvaluationSession : IAsyncDisposable
         });
 
         builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
-        builder.Logging.AddFilter((_, level) => level >= LogLevel.Warning);
+        builder.Logging.AddFilter((category, level) =>
+            category?.StartsWith("ModelContextProtocol", StringComparison.Ordinal) != true
+            && level >= LogLevel.Warning);
+        builder.Logging.AddFilter("ModelContextProtocol", LogLevel.None);
         builder.Configuration["Mcp:BaseUrl"] = mcpBaseUrl;
 
         builder.Services.AddAirportSimulation(builder.Environment);
@@ -82,6 +85,7 @@ public sealed class EvaluationSession : IAsyncDisposable
     public async Task<EvaluationReport> EvaluateAsync(
         IReadOnlyList<EvaluationScenario> scenarios,
         Action<ScenarioEvaluation>? onCompleted = null,
+        Action<string, string>? onStarting = null,
         CancellationToken cancellationToken = default)
     {
         var results = new List<ScenarioEvaluation>();
@@ -90,6 +94,7 @@ public sealed class EvaluationSession : IAsyncDisposable
         {
             foreach (var agentName in EvaluationAgents.Names)
             {
+                onStarting?.Invoke(scenario.Id, agentName);
                 var evaluation = await EvaluateOneAsync(
                     scenario,
                     agentName,
